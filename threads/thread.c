@@ -661,7 +661,7 @@ void thread_awake(int64_t ticks)
 		if (c_thread->wakeup_tick <= ticks)
 		{
 			el = list_remove(&c_thread->elem);
-			list_push_back(&sleep_list, &c_thread->elem);
+			thread_unblock(c_thread);
 		}
 		else
 		{
