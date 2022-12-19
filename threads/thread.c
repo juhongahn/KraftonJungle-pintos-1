@@ -615,31 +615,32 @@ allocate_tid(void)
 
 void thread_sleep(int64_t ticks)
 {
-
 	/* if the current thread is not idle thread,
 	  change the state of the caller thread to BLOCKED,
 	  store the local tick to wake up,
 	  update the global tick if necessary,
 	  and call schedule() */
 	/* When you manipulate thread list, disable interrupt! */
+
 	struct thread *curr = thread_current();
 	enum intr_level old_level;
 	ASSERT(!intr_context());
 	old_level = intr_disable();
 	if (curr != idle_thread)
 	{
-		curr->wakeup_tick = ticks;
 		list_push_back(&sleep_list, &curr->elem);
 		update_next_tick_to_awake(ticks);
+		curr->wakeup_tick = ticks;
+		thread_block();
+
 	}
-	thread_block();
 	intr_set_level(old_level);
 }
 
 void update_next_tick_to_awake(int64_t ticks)
 {
 	/* next_tick_to_awake 가 깨워야 할 스레드중 가장 작은 tick을 갖도록
-	업데이트 한다 */
+	   업데이트 한다 */
 	if (ticks <= get_next_tick_to_awake())
 	{
 		next_tick_to_awake = ticks;
@@ -655,26 +656,17 @@ get_next_tick_to_awake(void)
 void thread_awake(int64_t ticks)
 {
 	struct list_elem *el = list_begin(&sleep_list);
-
-	int64_t temp_min = INT64_MAX;
-
 	while (el != list_end(&sleep_list))
 	{
 		struct thread *c_thread = list_entry(el, struct thread, elem);
 		if (c_thread->wakeup_tick <= ticks)
 		{
-			el = list_remove(&c_thread->elem);
+			el = list_remove(el);
 			thread_unblock(c_thread);
 		}
 		else 
 		{
 			el = list_next(el);
-
-			if (c_thread->wakeup_tick < temp_min)
-			{
-				temp_min = c_thread->wakeup_tick;
-			}
 		}
 	}
-	update_next_tick_to_awake(temp_min);
 }
