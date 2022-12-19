@@ -655,6 +655,9 @@ get_next_tick_to_awake(void)
 void thread_awake(int64_t ticks)
 {
 	struct list_elem *el = list_begin(&sleep_list);
+
+	int64_t temp_min = INT64_MAX;
+
 	while (el != list_end(&sleep_list))
 	{
 		struct thread *c_thread = list_entry(el, struct thread, elem);
@@ -663,10 +666,15 @@ void thread_awake(int64_t ticks)
 			el = list_remove(&c_thread->elem);
 			thread_unblock(c_thread);
 		}
-		else
+		else 
 		{
 			el = list_next(el);
-			update_next_tick_to_awake(c_thread->wakeup_tick);
+
+			if (c_thread->wakeup_tick < temp_min)
+			{
+				temp_min = c_thread->wakeup_tick;
+			}
 		}
 	}
+	update_next_tick_to_awake(temp_min);
 }
