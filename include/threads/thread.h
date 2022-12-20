@@ -148,5 +148,6 @@ void update_next_tick_to_awake(int64_t ticks);
 int64_t get_next_tick_to_awake(void);
 
 void do_iret(struct intr_frame *tf);
+bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
 
 #endif /* threads/thread.h */
