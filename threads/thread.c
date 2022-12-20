@@ -732,13 +732,12 @@ void remove_with_lock(struct lock *lock)
 	struct list lock_waiters = thread_current()->donations;
 	struct list_elem *e;
 
-	printf("========for문 밖========\n");
-
-	for (e = list_begin(&lock_waiters); e != list_end(&lock_waiters); e = list_next(e))
+	e = list_head(&lock_waiters);
+	while (list_empty(&lock_waiters))
 	{
-		printf("========for문 안========\n");
-		struct thread *lock_waiter = list_entry(e, struct thread, d_elem);
+		e = list_next(e);
 
+		struct thread *lock_waiter = list_entry(e, struct thread, d_elem);
 		if (lock == lock_waiter->wait_on_lock)
 		{
 			list_remove(&lock_waiter->d_elem);
