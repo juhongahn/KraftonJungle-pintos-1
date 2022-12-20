@@ -190,6 +190,15 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
+	struct thread *curr_thread = thread_current();
+
+	if (lock->holder != NULL)
+	{
+		curr_thread->wait_on_lock = lock;
+		list_insert_ordered(&lock->holder->donations, &curr_thread->d_elem, cmp_priority, NULL);
+		donate_priority();
+	}
+
 	sema_down (&lock->semaphore);
 	lock->holder = thread_current ();
 }
@@ -224,6 +233,8 @@ lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
 
+	remove_with_lock(lock);
+	refresh_priority();
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
 }
@@ -341,4 +352,21 @@ cmp_sem_priority (const struct list_elem *a, const struct list_elem *b, void *au
 				> list_entry(list_begin(b_waiters), struct thread, elem)->priority;
 
 	// return list_begin(a_waiters) > list_begin(b_waiters);
+}
+
+/**
+ * 스레드의 우선순위가 변경될 때, donation을 고려하여
+ * 우선순위를 다시 결정하는 함수
+*/
+void refresh_priority(void)
+{
+	struct thread *curr_thread = thread_current();
+	curr_thread->priority = curr_thread->old_priority;
+
+	struct thread *lock_waiter = list_entry(list_begin(&curr_thread->donations), struct thread, d_elem);
+
+	if (lock_waiter->priority > curr_thread->priority)
+	{
+		curr_thread->priority = lock_waiter->priority;
+	}
 }
