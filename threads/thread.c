@@ -213,16 +213,7 @@ tid_t thread_create(const char *name, int priority,
 
 	/* Add to run queue. */
 	thread_unblock(t);
-
-	curr_thread = thread_current();
-
-	if (curr_thread->priority < t->priority)
-	{
-		intr_disable();
-		curr_thread->status = THREAD_READY;
-		list_insert_ordered(&ready_list, &curr_thread->elem, cmp_priority, NULL);
-		schedule();
-	}
+	test_max_priority();
 
 	return tid;
 }
@@ -331,7 +322,9 @@ void thread_yield(void)
 void thread_set_priority(int new_priority)
 {
 	thread_current()->priority = new_priority;
+	struct list_elem *prev = list_begin(&ready_list);
 	list_sort(&ready_list, cmp_priority, NULL);
+	test_max_priority();
 }
 
 /* Returns the current thread's priority. */
@@ -692,4 +685,16 @@ cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux)
 
 	// * 내림차순 정렬
 	return thread_a->priority > thread_b->priority;
+}
+
+void
+test_max_priority(void)
+{
+	struct thread *max_priority_thread = list_entry(list_begin(&ready_list), struct thread, elem);
+	struct thread *curr_thread = thread_current();
+
+	if (max_priority_thread->priority > curr_thread->priority)
+	{
+		thread_yield();
+	}
 }
