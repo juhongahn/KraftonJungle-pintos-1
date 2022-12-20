@@ -93,6 +93,11 @@ struct thread
 	char name[16];			   /* Name (for debugging purposes). */
 	int priority;			   /* Priority. */
 	int64_t wakeup_tick;
+	struct lock *wait_on_lock; /* 자신이 기다리고 있는 락의 주소 */
+	struct list donations;    /* 우선순위를 준 스레드 목록 */
+	struct list_elem d_elem;   /* 도너를 연결하기 위한 elem */
+	int old_priority;          /* 도네이트 받기 전 우선순위 */
+
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem; /* List element. */
 
@@ -149,5 +154,9 @@ int64_t get_next_tick_to_awake(void);
 
 void do_iret(struct intr_frame *tf);
 bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
+void test_max_priority(void);
+void donate_priority(void);
+void remove_with_lock(struct lock *lock);
+void refresh_priority(void);
 
 #endif /* threads/thread.h */
