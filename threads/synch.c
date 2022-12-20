@@ -113,6 +113,8 @@ sema_up (struct semaphore *sema) {
 		thread_unblock (list_entry (list_pop_front (&sema->waiters),
 					struct thread, elem));
 	sema->value++;
+	list_sort(&sema->waiters, cmp_priority, NULL);
+	test_max_priority();
 	intr_set_level (old_level);
 }
 
