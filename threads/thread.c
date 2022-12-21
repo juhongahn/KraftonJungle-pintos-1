@@ -213,16 +213,7 @@ tid_t thread_create(const char *name, int priority,
 
 	/* Add to run queue. */
 	thread_unblock(t);
-
-	curr_thread = thread_current();
-
-	if (curr_thread->priority < t->priority)
-	{
-		intr_disable();
-		curr_thread->status = THREAD_READY;
-		list_insert_ordered(&ready_list, &curr_thread->elem, cmp_priority, NULL);
-		schedule();
-	}
+	test_max_priority();
 
 	return tid;
 }
@@ -332,6 +323,10 @@ void thread_set_priority(int new_priority)
 {
 	thread_current()->priority = new_priority;
 	list_sort(&ready_list, cmp_priority, NULL);
+	test_max_priority();
+
+	// donate_priority();
+	// refresh_priority();
 }
 
 /* Returns the current thread's priority. */
@@ -435,6 +430,9 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+	t->wait_on_lock = NULL;
+	list_init(&t->donations);
+	t->old_priority = priority;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -692,4 +690,58 @@ cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux)
 
 	// * 내림차순 정렬
 	return thread_a->priority > thread_b->priority;
+}
+
+void
+test_max_priority(void)
+{
+	struct thread *max_priority_thread = list_entry(list_begin(&ready_list), struct thread, elem);
+	struct thread *curr_thread = thread_current();
+
+	if (max_priority_thread->priority > curr_thread->priority)
+	{
+		thread_yield();
+	}
+}
+
+void
+donate_priority(void)
+{
+	struct thread *curr_thread = thread_current();
+	struct lock *curr_thread_wait_lock = curr_thread->wait_on_lock;
+	struct thread *lock_holder = curr_thread_wait_lock->holder;
+	struct list lock_waiters = curr_thread_wait_lock->semaphore.waiters;
+	int cnt = 0;
+
+	while (curr_thread->priority > lock_holder->priority
+			&& lock_holder != NULL)
+	{
+		if (++cnt >= 8)
+		{
+			break;
+		}
+
+		lock_holder->priority = curr_thread->priority;
+		curr_thread = lock_holder;
+		lock_holder = lock_holder->wait_on_lock->holder;
+	}
+}
+
+void remove_with_lock(struct lock *lock)
+{
+	struct list lock_waiters = thread_current()->donations;
+	struct list_elem *e;
+
+	e = list_head(&lock_waiters);
+	while (list_empty(&lock_waiters))
+	{
+		e = list_next(e);
+
+		struct thread *lock_waiter = list_entry(e, struct thread, d_elem);
+		if (lock == lock_waiter->wait_on_lock)
+		{
+			list_remove(&lock_waiter->d_elem);
+			break;
+		}
+	}
 }
