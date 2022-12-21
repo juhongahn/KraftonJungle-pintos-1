@@ -254,11 +254,12 @@
               > list_entry(list_begin(b_waiters), struct thread, elem)->priority;
   }
   ```
-</details>
 
 - 리스트 엔트리에 대한 이해 부족
 
 - 레퍼런스를 통해 함수 사용 방법을 이해하게 됨.
+
+</details>
 
 ### 느낀 점
 
