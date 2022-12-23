@@ -92,6 +92,8 @@
 #### `remove_with_lock`
 
 > 동료들은 다른 시선으로 볼 수 있다.
+> 
+> 포인터와 메모리 구조에 대해 빠삭하게 공부하자.
 
 <details>
   <summary>Before</summary>
@@ -116,9 +118,9 @@
   }
   ```
 
-- 로직의 오류가 코드에 그대로 반영됨.
+- 로직의 오류가 코드에 그대로 반영됨. (`break`문)
 
-- 디버깅 부족
+- 구조체 대입 연산에 대한 이해 부족
 
 </details>
 
@@ -143,7 +145,29 @@
   }
   ```
 
+  또는
+
+  ```c
+  void remove_with_lock(struct lock *lock)
+	{
+		struct list *lock_waiters = &thread_current()->donations;
+			struct list_elem *e;
+
+			for (e = list_begin(lock_waiters); e != list_end(lock_waiters); e = list_next(e))
+			{
+					struct thread *lock_waiter = list_entry(e, struct thread, d_elem);
+
+					if (lock == lock_waiter->wait_on_lock)
+					{
+							list_remove(&lock_waiter->d_elem);
+					}
+			}
+	}
+  ```
+
 - 동료들과의 회의로 로직의 오류를 고쳐잡고, 코드 개선
+
+- 디버깅
 
 </details>
 
@@ -274,3 +298,5 @@
 - 테스트를 통과하기 위해서 주먹구구식으로 구현해나가는 방식에 대한 아쉬움
 
 - 문제가 생겼을 때 로직에 대한 고민 필요
+
+- C언어와 메모리 공간에 대한 명확한 이해
