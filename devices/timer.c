@@ -96,8 +96,11 @@ void timer_sleep(int64_t ticks)
 	int64_t start = timer_ticks();
 
 	ASSERT(intr_get_level() == INTR_ON);
+
+	/* 기존 busy waiting 방식 */
 	// while (timer_elapsed (start) < ticks)
 	//	thread_yield ();
+
 	thread_sleep(start + ticks);
 }
 
@@ -131,6 +134,11 @@ timer_interrupt(struct intr_frame *args UNUSED)
 {
 	ticks++;
 	thread_tick();
+
+	/**
+	 * next_tick_to_awake와 현재 tick을 비교하여,
+	 * 깨워야 할 쓰레드가 있는지 확인
+	 */
 	int64_t global_ticks = get_next_tick_to_awake();
 	if (ticks >= global_ticks)
 		thread_awake(ticks);

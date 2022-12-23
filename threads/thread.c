@@ -27,6 +27,7 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+/* block 상태인 쓰레드들이 저장된 리스트 */
 static struct list sleep_list;
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -34,6 +35,7 @@ static struct thread *idle_thread;
 /* Initial thread, the thread running init.c:main(). */
 static struct thread *initial_thread;
 
+/* sleep list에서 대기중인 쓰레드들의 wakeup tic중 최소값을 저장 */
 static int64_t next_tick_to_awake = INT64_MAX;
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
@@ -69,6 +71,7 @@ void update_next_tick_to_awake(int64_t ticks);
 void thread_sleep(int64_t ticks);
 int64_t get_next_tick_to_awake(void);
 bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
+bool cmp_donation_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -110,7 +113,7 @@ void thread_init(void)
 		.address = (uint64_t)gdt};
 	lgdt(&gdt_ds);
 
-	/* Init the globla thread context */
+	/* Init the global thread context */
 	lock_init(&tid_lock);
 	list_init(&ready_list);
 	list_init(&sleep_list);
@@ -213,6 +216,7 @@ tid_t thread_create(const char *name, int priority,
 
 	/* Add to run queue. */
 	thread_unblock(t);
+	/* 현재 실행 중인 쓰레드보다 우선순위가 더 높을 경우 선점 */
 	test_max_priority();
 
 	return tid;
@@ -321,12 +325,12 @@ void thread_yield(void)
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority)
 {
-	thread_current()->priority = new_priority;
-	list_sort(&ready_list, cmp_priority, NULL);
-	test_max_priority();
+	/* 우선순위를 재설정 */
+	thread_current()->old_priority = new_priority;
 
-	// donate_priority();
-	// refresh_priority();
+	/* 우선순위가 변경되었으므로 우선순위를 재조정 */
+	refresh_priority();
+	test_max_priority();
 }
 
 /* Returns the current thread's priority. */
@@ -430,6 +434,8 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+
+	/* priority inversion problem 관련 항목 초기화 */
 	t->wait_on_lock = NULL;
 	list_init(&t->donations);
 	t->old_priority = priority;
@@ -624,15 +630,9 @@ allocate_tid(void)
 	return tid;
 }
 
+/* 실행 중인 쓰레드를 sleep상태로 만드는 메서드 */
 void thread_sleep(int64_t ticks)
 {
-	/* if the current thread is not idle thread,
-	  change the state of the caller thread to BLOCKED,
-	  store the local tick to wake up,
-	  update the global tick if necessary,
-	  and call schedule() */
-	/* When you manipulate thread list, disable interrupt! */
-
 	struct thread *curr = thread_current();
 	enum intr_level old_level;
 	ASSERT(!intr_context());
@@ -643,27 +643,27 @@ void thread_sleep(int64_t ticks)
 		update_next_tick_to_awake(ticks);
 		curr->wakeup_tick = ticks;
 		thread_block();
-
 	}
 	intr_set_level(old_level);
 }
 
+/* sleep list에 있는 쓰레드들의 틱 중 최소값으로 next_tick_to_awake를 갱신 */
 void update_next_tick_to_awake(int64_t ticks)
 {
-	/* next_tick_to_awake 가 깨워야 할 스레드중 가장 작은 tick을 갖도록
-	   업데이트 한다 */
 	if (ticks <= get_next_tick_to_awake())
 	{
 		next_tick_to_awake = ticks;
 	}
 }
 
+/* next_tick_to_awake를 반환 */
 int64_t
 get_next_tick_to_awake(void)
 {
 	return next_tick_to_awake;
 }
 
+/* sleep list를 순회하며, 깨워야 할 쓰레드(들)을 깨움. */
 void thread_awake(int64_t ticks)
 {
 	struct list_elem *el = list_begin(&sleep_list);
@@ -675,15 +675,19 @@ void thread_awake(int64_t ticks)
 			el = list_remove(el);
 			thread_unblock(c_thread);
 		}
-		else 
+		else
 		{
 			el = list_next(el);
 		}
 	}
 }
 
-bool
-cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux)
+/**
+ * 인자로 주어진 스레드들의 우선순위를 비교하여,
+ * 첫 번째 인자의 우선순위가 더 높을 경우
+ * 1을 반환 (내림차순 정렬)
+ */
+bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux)
 {
 	struct thread *thread_a = list_entry(a, struct thread, elem);
 	struct thread *thread_b = list_entry(b, struct thread, elem);
@@ -692,8 +696,11 @@ cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux)
 	return thread_a->priority > thread_b->priority;
 }
 
-void
-test_max_priority(void)
+/**
+ * 현재 실행 중인 쓰레드와 ready_list에서 가장 높은 우선순위의 쓰레드를 비교하여
+ * 더 높은 우선순위의 쓰레드를 실행한다.
+ * */
+void test_max_priority(void)
 {
 	struct thread *max_priority_thread = list_entry(list_begin(&ready_list), struct thread, elem);
 	struct thread *curr_thread = thread_current();
@@ -704,44 +711,50 @@ test_max_priority(void)
 	}
 }
 
-void
-donate_priority(void)
+/* nested donation을 고려하여, 현재 쓰레드가 기다리고 있는 lock과 연결된
+	모든 쓰레드들을 순회하며 현재 쓰레드의 우선순위를
+	lock을 보유하고 있는 쓰레드에게 기부 */
+void donate_priority(void)
 {
 	struct thread *curr_thread = thread_current();
-	struct lock *curr_thread_wait_lock = curr_thread->wait_on_lock;
-	struct thread *lock_holder = curr_thread_wait_lock->holder;
-	struct list lock_waiters = curr_thread_wait_lock->semaphore.waiters;
 	int cnt = 0;
 
-	while (curr_thread->priority > lock_holder->priority
-			&& lock_holder != NULL)
+	for (cnt = 0; cnt < 8; cnt++)
 	{
-		if (++cnt >= 8)
-		{
+		if (curr_thread->wait_on_lock == NULL)
 			break;
+		struct thread *lock_holder = curr_thread->wait_on_lock->holder;
+		if (curr_thread->priority > lock_holder->priority)
+		{
+			lock_holder->priority = curr_thread->priority;
+			curr_thread = lock_holder;
 		}
-
-		lock_holder->priority = curr_thread->priority;
-		curr_thread = lock_holder;
-		lock_holder = lock_holder->wait_on_lock->holder;
 	}
 }
 
+/* lock을 해지했을 때, 현재 쓰레드의 donations를 확인하여
+	해지한 lock을 기다리고 있는 엔트리(들)을 삭제 */
 void remove_with_lock(struct lock *lock)
 {
-	struct list lock_waiters = thread_current()->donations;
+	struct thread *curr_thread = thread_current();
 	struct list_elem *e;
 
-	e = list_head(&lock_waiters);
-	while (list_empty(&lock_waiters))
+	for (e = list_begin(&curr_thread->donations); e != list_end(&curr_thread->donations); e = list_next(e))
 	{
-		e = list_next(e);
-
 		struct thread *lock_waiter = list_entry(e, struct thread, d_elem);
+
 		if (lock == lock_waiter->wait_on_lock)
 		{
 			list_remove(&lock_waiter->d_elem);
-			break;
 		}
 	}
+}
+
+bool cmp_donation_priority(const struct list_elem *a, const struct list_elem *b, void *aux)
+{
+	struct thread *thread_a = list_entry(a, struct thread, d_elem);
+	struct thread *thread_b = list_entry(b, struct thread, d_elem);
+
+	// * 내림차순 정렬
+	return thread_a->priority > thread_b->priority;
 }
