@@ -130,7 +130,7 @@
   ```c
   void remove_with_lock(struct lock *lock)
   {
-  struct thread *curr_thread = thread_current();
+      struct thread *curr_thread = thread_current();
       struct list_elem *e;
 
       for (e = list_begin(&curr_thread->donations); e != list_end(&curr_thread->donations); e = list_next(e))
@@ -150,19 +150,20 @@
   ```c
   void remove_with_lock(struct lock *lock)
 	{
-		struct list *lock_waiters = &thread_current()->donations;
-			struct list_elem *e;
+      struct list *lock_waiters = &thread_current()->donations;
+      struct list_elem *e;
 
-			for (e = list_begin(lock_waiters); e != list_end(lock_waiters); e = list_next(e))
-			{
-					struct thread *lock_waiter = list_entry(e, struct thread, d_elem);
 
-					if (lock == lock_waiter->wait_on_lock)
-					{
-							list_remove(&lock_waiter->d_elem);
-					}
-			}
-	}
+      for (e = list_begin(lock_waiters); e != list_end(lock_waiters); e = list_next(e))
+      {
+          struct thread *lock_waiter = list_entry(e, struct thread, d_elem);
+
+          if (lock == lock_waiter->wait_on_lock)
+          {
+              list_remove(&lock_waiter->d_elem);
+          }
+      }
+  }
   ```
 
 - 동료들과의 회의로 로직의 오류를 고쳐잡고, 코드 개선
