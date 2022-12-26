@@ -87,13 +87,6 @@ typedef int tid_t;
  * blocked state is on a semaphore wait list. */
 struct thread {
 	/* Owned by thread.c. */
-<<<<<<< HEAD
-	tid_t tid;                          /* Thread identifier. */
-	enum thread_status status;          /* Thread state. */
-	char name[16];                      /* Name (for debugging purposes). */
-	int priority;                       /* Priority. */
-	int64_t wakeup_tick;				/* Time to wakeup */
-=======
 	tid_t tid;				   /* Thread identifier. */
 	enum thread_status status; /* Thread state. */
 	char name[16];			   /* Name (for debugging purposes). */
@@ -104,7 +97,6 @@ struct thread {
 	struct list_elem d_elem;   /* 도너를 연결하기 위한 elem */
 	int old_priority;		   /* 도네이트 받기 전 우선순위 */
 
->>>>>>> juhongahn
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
@@ -159,9 +151,6 @@ void thread_awake(int64_t);
 void update_next_tick_to_awake(int64_t);
 int64_t get_next_tick_to_awake(void);
 
-<<<<<<< HEAD
-void do_iret (struct intr_frame *tf);
-=======
 void do_iret(struct intr_frame *tf);
 bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
 bool cmp_donation_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
@@ -169,6 +158,5 @@ void test_max_priority(void);
 void donate_priority(void);
 void remove_with_lock(struct lock *lock);
 void refresh_priority(void);
->>>>>>> juhongahn
 
 #endif /* threads/thread.h */
