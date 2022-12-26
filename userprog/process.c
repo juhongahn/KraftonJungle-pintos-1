@@ -179,11 +179,13 @@ process_exec (void *f_name) {
 	/* And then load the binary */
 	success = load (file_name, &_if);
 
+	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
 	if (!success)
 		return -1;
-
+	
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
@@ -331,7 +333,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	int i;
 
 	/* 파일 이름, 인자, 인자, ... */
-	char *argv[20] = {NULL, };
+	char *argv[64] = {NULL, };
 
 	/* command line 개수 */
 	int argc = 0;
@@ -341,8 +343,6 @@ load (const char *file_name, struct intr_frame *if_) {
 	{
 		argv[argc++] = token;
 	}
-
-
 
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
@@ -440,9 +440,10 @@ load (const char *file_name, struct intr_frame *if_) {
 		memcpy((void *)if_->rsp, (void *)argv[i], arg_size);
 		argv[i] = (char *)if_->rsp;
 	}
-	int mod = if_->rsp % 8;
-	if (mod)
+
+	if (if_->rsp % 8)
 	{
+		int mod = (if_->rsp % 8);
 		if_->rsp -= mod;
 		memset((void *)if_->rsp, 0, mod);
 	}
@@ -453,7 +454,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	for (int i=argc-1; i>=0; i--)
 	{	
 		if_->rsp -= 8;
-		memcpy((void *)if_->rsp, (void *)argv[i], 8);
+		memcpy((void *)if_->rsp, &argv[i], 8);
 	}
 
 	if_->rsp -= 8;
@@ -463,6 +464,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	if_->R.rdi = argc;
 	if_->R.rsi = if_->rsp + 8;
 
+	
 	success = true;
 
 done:
