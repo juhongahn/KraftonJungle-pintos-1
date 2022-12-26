@@ -26,6 +26,8 @@ static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
+static int parse_file_name (char **argv, const char *file_name);
+static void pass_arguments (int argc, char **argv, struct intr_frame *if_);
 
 /* General process initializer for initd and other process. */
 static void
@@ -332,17 +334,9 @@ load (const char *file_name, struct intr_frame *if_) {
 	bool success = false;
 	int i;
 
-	/* 파일 이름, 인자, 인자, ... */
 	char *argv[64] = {NULL, };
-
-	/* command line 개수 */
-	int argc = 0;
-	char *token, *save_ptr;
-
-	for (token = strtok_r(file_name, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr))
-	{
-		argv[argc++] = token;
-	}
+	int argc;
+	argc = parse_file_name(argv, file_name);
 
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
@@ -429,42 +423,9 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
 
-	/* TODO: Your code goes here.
-	 * TODO: Implement argument passing (see project2/argument_passing.html). */
-
 	/* 유저 스택에 인자 저장하기 */
-	for (int i=argc-1; i>=0; i--)
-	{	
-		int arg_size = strlen(argv[i]) + 1;
-		if_->rsp -= arg_size;
-		memcpy((void *)if_->rsp, (void *)argv[i], arg_size);
-		argv[i] = (char *)if_->rsp;
-	}
+	pass_arguments(argc, argv, if_);
 
-	if (if_->rsp % 8)
-	{
-		int mod = (if_->rsp % 8);
-		if_->rsp -= mod;
-		memset((void *)if_->rsp, 0, mod);
-	}
-
-	if_->rsp -= 8;
-	memset((void *)if_->rsp, 0, 8);
-
-	for (int i=argc-1; i>=0; i--)
-	{	
-		if_->rsp -= 8;
-		memcpy((void *)if_->rsp, &argv[i], 8);
-	}
-
-	if_->rsp -= 8;
-	memset((void *)if_->rsp, 0, 8);
-
-	/* rdi, rsi 초기화 */
-	if_->R.rdi = argc;
-	if_->R.rsi = if_->rsp + 8;
-
-	
 	success = true;
 
 done:
@@ -599,6 +560,60 @@ setup_stack (struct intr_frame *if_) {
 
 	return success;
 }
+
+/* 공백을 구분자로 하여 FILE_NAME(command line)을 단어 단위로 나눈다.
+    { 파일 이름, 인자, 인자, ... }
+    분할된 단어(token)의 개수(argc)를 반환한다. */
+static int
+parse_file_name (char **argv, const char *file_name) {
+    int argc = 0;
+    char *token, *save_ptr;
+
+    for (token = strtok_r(file_name, " ", &save_ptr); token != NULL;
+        token = strtok_r (NULL, " ", &save_ptr))
+    {
+        argv[argc++] = token;
+    }
+
+    return argc;
+}
+
+/* 인자와 파일 이름을 사용자 스택에 차례대로 저장하고,
+	%rsi가 argv를 가리키도록 하고, %rdi는 argc를 가리키도록 한다. */
+static void
+pass_arguments (int argc, char **argv, struct intr_frame *if_) {
+    for (int i=argc-1; i>=0; i--)
+    {
+        int arg_size = strlen(argv[i]) + 1;
+        if_->rsp -= arg_size;
+        memcpy((void *)if_->rsp, (void *)argv[i], arg_size);
+        argv[i] = (char *)if_->rsp;
+    }
+
+    if (if_->rsp % 8)
+    {
+        int mod = (if_->rsp % 8);
+        if_->rsp -= mod;
+        memset((void *)if_->rsp, 0, mod);
+    }
+
+    if_->rsp -= 8;
+    memset((void *)if_->rsp, 0, 8);
+
+    for (int i=argc-1; i>=0; i--)
+    {   
+        if_->rsp -= 8;
+        memcpy((void *)if_->rsp, &argv[i], 8);
+    }
+
+    if_->rsp -= 8;
+    memset((void *)if_->rsp, 0, 8);
+
+    /* rdi, rsi 초기화 */
+    if_->R.rdi = argc;
+    if_->R.rsi = if_->rsp + 8;
+}
+
 
 /* Adds a mapping from user virtual address UPAGE to kernel
  * virtual address KPAGE to the page table.
