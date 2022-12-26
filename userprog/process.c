@@ -26,6 +26,9 @@ static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
+char** parse_file_name(char* file_name); 
+void argument_stack(char **parse ,int count ,void **esp);
+int cal_token_len(char **tokens);
 
 /* General process initializer for initd and other process. */
 static void
@@ -42,6 +45,19 @@ tid_t
 process_create_initd (const char *file_name) {
 	char *fn_copy;
 	tid_t tid;
+
+	// /* file_name을 토큰으로 파싱 */
+	// /* file_name 파싱, 인자 갯수 */
+	// char *argv[64];
+	// int argc = 0;
+	// char *token, *save_ptr;
+
+	// token = strtok_r(file_name, " ", &save_ptr);
+	// while (token)
+	// {
+	// 	argv[argc++] = token;
+	// 	token = strtok_r(NULL, " ", &save_ptr);
+	// }
 
 	/* Make a copy of FILE_NAME.
 	 * Otherwise there's a race between the caller and load(). */
@@ -159,11 +175,24 @@ error:
 }
 
 /* Switch the current execution context to the f_name.
- * Returns -1 on fail. */
+ * Returns -1 on fail. 
+ * file_name을 파싱하고 user stack에 넣어줘야한다. */
 int
 process_exec (void *f_name) {
 	char *file_name = f_name;
 	bool success;
+
+	/* file_name 파싱, 인자 갯수 */
+	char *argv[64];
+	int argc = 0;
+	char *token, *save_ptr;
+
+	token = strtok_r(file_name, " ", &save_ptr);
+	while (token)
+	{
+		argv[argc++] = token;
+		token = strtok_r(NULL, " ", &save_ptr);
+	}
 
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
@@ -180,11 +209,18 @@ process_exec (void *f_name) {
 	success = load (file_name, &_if);
 
 	/* If load failed, quit. */
-	palloc_free_page (file_name);
 	if (!success)
 		return -1;
+	
 
-	/* Start switched process. */
+	/* set up stack! */
+	argument_stack(argv, argc, &_if.rsp);
+	_if.R.rdi = argc;
+	_if.R.rsi = _if.rsp + 8;
+
+	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+	palloc_free_page (file_name);
+	/* Start switched process. 커널로부터 나와서 유저 프로세스로 점프. */
 	do_iret (&_if);
 	NOT_REACHED ();
 }
@@ -201,6 +237,7 @@ process_exec (void *f_name) {
  * does nothing. */
 int
 process_wait (tid_t child_tid UNUSED) {
+	while(1);
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
@@ -637,3 +674,63 @@ setup_stack (struct intr_frame *if_) {
 	return success;
 }
 #endif /* VM */
+
+// /* file_name을 토큰으로 파싱 */
+// char **
+// parse_file_name(char *file_name)
+// {
+// 	char* tokens[20] = {NULL, };
+// 	/* 정적 배열로 문자열 복사 */
+
+// 	int idx = 0;
+// 	char *token, *save_ptr;
+// 	for (token = strtok_r(file_name, " ", &save_ptr);  token != NULL; token = strtok_r (NULL, " ", &save_ptr))
+// 	{
+// 		tokens[idx] = token;
+// 		idx++;
+// 	}
+// 	return tokens;
+// }
+
+// /* 토큰 갯수 반환 */
+// int cal_token_len(char **tokens)
+// {
+// 	int len = 0;
+// 	for (int i=0;tokens[i]!=NULL; i++) len++;
+// 	return len;
+// }
+
+
+/* 유저 스택에 프로그램 이름과 인자들을 저장하는 함수 
+ * rsp에서 -4 씩 이동하면서 인자를 저장.(rsp - 4)
+ */
+void argument_stack(char **argv ,int argc ,void **rsp)
+{
+	for (int i=argc-1; i>=0; i--)
+	{
+		int arg_size = strlen(argv[i]) + 1;
+		*rsp -= arg_size;
+		memcpy(*rsp, &argv[i], arg_size);
+		argv[i] = (char *)*rsp;
+	}
+
+	if ((int)*rsp % 8)
+	{
+		int padding = (int)*rsp % 8;
+		*rsp -= padding;
+		memset(*rsp, 0, padding);
+	}
+
+	*rsp -= 8;
+	memset(*rsp, 0, 8);
+
+	for(int i=argc-1; i>=0; i--)
+	{
+		*rsp -= 8;
+		memcpy(*rsp, &argv[i], 8);
+	}
+
+	*rsp -= 8;
+	memset(*rsp, 0, 8);
+
+}
