@@ -568,9 +568,10 @@ static int
 parse_file_name (char **argv, const char *file_name) {
     int argc = 0;
     char *token, *save_ptr;
+	const char DELIMITER[2] = " ";
 
-    for (token = strtok_r(file_name, " ", &save_ptr); token != NULL;
-        token = strtok_r (NULL, " ", &save_ptr))
+    for (token = strtok_r(file_name, DELIMITER, &save_ptr); token != NULL;
+        token = strtok_r (NULL, DELIMITER, &save_ptr))
     {
         argv[argc++] = token;
     }
@@ -582,36 +583,44 @@ parse_file_name (char **argv, const char *file_name) {
 	%rsi가 argv를 가리키도록 하고, %rdi는 argc를 가리키도록 한다. */
 static void
 pass_arguments (int argc, char **argv, struct intr_frame *if_) {
-    for (int i=argc-1; i>=0; i--)
+	/* 커맨드 라인의 오른쪽에서 왼쪽순으로 스택에 넣기 위해 argv의 뒤에서부터 순회를 시작 */
+    for (int i = argc - 1; i >= 0; i--)
     {
         int arg_size = strlen(argv[i]) + 1;
         if_->rsp -= arg_size;
         memcpy((void *)if_->rsp, (void *)argv[i], arg_size);
+
+		/* 두 번째 순회에서 스택에 각 주소값을 넣어야 하기 때문에
+			argv[i]에 주소값을 재할당 */
         argv[i] = (char *)if_->rsp;
     }
 
-    if (if_->rsp % 8)
+	/* 바이트 정렬을 위해 주소값을 8의 배수로 맞추고 남는 공간은 0으로 채우기 */
+	int mod = if_->rsp % ALIGNMENT;
+    if (mod)
     {
-        int mod = (if_->rsp % 8);
         if_->rsp -= mod;
         memset((void *)if_->rsp, 0, mod);
     }
 
-    if_->rsp -= 8;
-    memset((void *)if_->rsp, 0, 8);
+	/* null pointer sentinel (required by the C standard) */
+    if_->rsp -= ALIGNMENT;
+    memset((void *)if_->rsp, 0, ALIGNMENT);
 
-    for (int i=argc-1; i>=0; i--)
+    for (int i = argc - 1; i >= 0; i--)
     {   
-        if_->rsp -= 8;
-        memcpy((void *)if_->rsp, &argv[i], 8);
+        if_->rsp -= ADDR_SIZE;
+        memcpy((void *)if_->rsp, &argv[i], ADDR_SIZE);
     }
 
-    if_->rsp -= 8;
-    memset((void *)if_->rsp, 0, 8);
+	/* 마지막으로, 여느 스택 프레임과 동일한 구조를 갖추기 위해
+		가짜 반환 주소(return address) 넣기 */
+    if_->rsp -= ADDR_SIZE; /* stack top */
+    memset((void *)if_->rsp, 0, ADDR_SIZE);
 
     /* rdi, rsi 초기화 */
     if_->R.rdi = argc;
-    if_->R.rsi = if_->rsp + 8;
+    if_->R.rsi = if_->rsp + ADDR_SIZE; /* argv[0]의 주소 */
 }
 
 
