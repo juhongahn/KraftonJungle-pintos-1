@@ -70,11 +70,8 @@ void thread_awake(int64_t ticks);
 void update_next_tick_to_awake(int64_t ticks);
 void thread_sleep(int64_t ticks);
 int64_t get_next_tick_to_awake(void);
-<<<<<<< HEAD
-=======
 bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
 bool cmp_donation_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
->>>>>>> juhongahn
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -218,11 +215,8 @@ tid_t thread_create(const char *name, int priority,
 
 	/* Add to run queue. */
 	thread_unblock(t);
-<<<<<<< HEAD
-=======
 	/* 현재 실행 중인 쓰레드보다 우선순위가 더 높을 경우 선점 */
 	test_max_priority();
->>>>>>> juhongahn
 
 	return tid;
 }
@@ -330,16 +324,12 @@ void thread_yield(void)
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority)
 {
-<<<<<<< HEAD
-	thread_current()->priority = new_priority;
-=======
 	/* 우선순위를 재설정 */
 	thread_current()->old_priority = new_priority;
 
 	/* 우선순위가 변경되었으므로 우선순위를 재조정 */
 	refresh_priority();
 	test_max_priority();
->>>>>>> juhongahn
 }
 
 /* Returns the current thread's priority. */
@@ -443,14 +433,11 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
-<<<<<<< HEAD
-=======
 
 	/* priority inversion problem 관련 항목 초기화 */
 	t->wait_on_lock = NULL;
 	list_init(&t->donations);
 	t->old_priority = priority;
->>>>>>> juhongahn
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -692,9 +679,6 @@ void thread_awake(int64_t ticks)
 			el = list_next(el);
 		}
 	}
-<<<<<<< HEAD
-}
-=======
 }
 
 /**
@@ -773,4 +757,3 @@ bool cmp_donation_priority(const struct list_elem *a, const struct list_elem *b,
 	// * 내림차순 정렬
 	return thread_a->priority > thread_b->priority;
 }
->>>>>>> juhongahn
