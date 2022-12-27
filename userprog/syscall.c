@@ -56,6 +56,7 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+	lock_init(&filesys_lock);
 }
 
 /* The main system call interface */
@@ -203,6 +204,50 @@ filesize (int fd) {
 
 int
 read (int fd, void *buffer, unsigned size) {
+
+	/* 파일 디스크립터에 해당하는 파일을 가져와야한다. */
+	struct thread *curr_thread = thread_current();
+	struct file **fdt = cur_thread->fdt;
+	if (fd == 0)
+	{
+		buffer = (char*)buffer;
+		uint8_t key;
+		for (int i=0; i<size; i++)
+		{
+			key = input_getc();
+			*buffer++ = key;
+			if (key == '\0')
+				break;
+		}
+	}
+	else if (fd == 1)
+	{
+		return -1;
+	}
+	else
+	{
+		struct file *curr_file = fdt[fd];
+
+		if (file == NULL)
+			return -1;
+		if (curr_file->inode->open_cnt == 0)
+			lock_acquire(curr_file->write_lock);
+
+		lock_acquire(curr_file->read_lock);
+		curr_file->inode->open_cnt++;
+		lock_release(curr_file->read_lock);
+
+		off_t read_size = file_read(curr_file, buffer, size);
+		
+		lock_acquire(curr_file->read_lock);
+		curr_file->inode->open_cnt--;
+		lock_release(curr_file->read_lock);
+
+		if (curr_file->inode->open_cnt == 0)
+			lock_release(curr_file->write_lock);
+	}
+	
+	return read_size;
 }
 
 int
