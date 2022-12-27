@@ -334,6 +334,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	bool success = false;
 	int i;
 
+	/* 커맨드 라인 파싱 */
 	char *argv[64] = {NULL, };
 	int argc;
 	argc = parse_file_name(argv, file_name);
@@ -583,7 +584,8 @@ parse_file_name (char **argv, const char *file_name) {
 	%rsi가 argv를 가리키도록 하고, %rdi는 argc를 가리키도록 한다. */
 static void
 pass_arguments (int argc, char **argv, struct intr_frame *if_) {
-	/* 커맨드 라인의 오른쪽에서 왼쪽순으로 스택에 넣기 위해 argv의 뒤에서부터 순회를 시작 */
+	/* 인자를 커맨드 라인의 오른쪽에서 왼쪽순으로
+		스택에 넣기 위해 argv의 뒤에서부터 순회를 시작 */
     for (int i = argc - 1; i >= 0; i--)
     {
         int arg_size = strlen(argv[i]) + 1;
@@ -607,6 +609,7 @@ pass_arguments (int argc, char **argv, struct intr_frame *if_) {
     if_->rsp -= ALIGNMENT;
     memset((void *)if_->rsp, 0, ALIGNMENT);
 
+	/* 각 인자의 주소값을 스택에 넣기 */
     for (int i = argc - 1; i >= 0; i--)
     {   
         if_->rsp -= ADDR_SIZE;
