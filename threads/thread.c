@@ -11,6 +11,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+#include "filesys/file.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -191,6 +192,7 @@ tid_t thread_create(const char *name, int priority,
 	struct thread *t;
 	tid_t tid;
 	struct thread *curr_thread;
+	struct file **fdt;
 
 	ASSERT(function != NULL);
 
@@ -213,6 +215,13 @@ tid_t thread_create(const char *name, int priority,
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
+	/* allocate file descriptor table */
+	*t->fdt = palloc_get_page(PAL_ZERO); // ?
+
+	memset(*t->fdt, 0, sizeof(struct file*));
+	memset(*(t->fdt + sizeof(struct file*)), 0, sizeof(struct file*));
+
+	t->next_fd = 2;
 
 	/* Add to run queue. */
 	thread_unblock(t);
