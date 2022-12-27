@@ -11,6 +11,8 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 
+typedef int pid_t;
+
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 static void check_address(void *addr);
@@ -19,7 +21,7 @@ static void halt (void) NO_RETURN;
 static void exit (int status) NO_RETURN;
 static pid_t fork (const char *thread_name);
 static int exec (const char *file);
-static int wait (pid_t);
+static int wait (pid_t pid);
 static bool create (const char *file, unsigned initial_size);
 static bool remove (const char *file);
 static int open (const char *file);
@@ -59,6 +61,7 @@ syscall_init (void) {
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f) {
+	// FIXME: 검증 대상 변경, 위치 변경
 	/* 포인터 유효성 검증 */
 	check_address(f->rsp);
 
@@ -78,15 +81,19 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_CREATE:
+		create(f->R.rsi, f->R.rdi);
 		break;
 
 	case SYS_REMOVE:
+		remove(f->R.rsi);
 		break;
 
 	case SYS_OPEN:
+		open(f->R.rsi);
 		break;
 
 	case SYS_FILESIZE:
+		open(f->R.rsi);
 		break;
 
 	case SYS_READ:
@@ -102,6 +109,7 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_CLOSE:
+		close(f->R.rsi);
 		break;
 
 	default:
@@ -163,10 +171,23 @@ remove (const char *file) {
 
 int
 open (const char *file) {
+	struct thread *curr_t = thread_current();
+	struct file *f = filesys_open(file);
+
+	if (f) { // FIXME: next_fd 갱신 로직 최적화
+		curr_t->fdt[curr_t->next_fd] = f;
+		return curr_t->next_fd++;
+	}
+	else {
+		return -1;
+	}
 }
 
 int
 filesize (int fd) {
+	struct thread *curr_t = thread_current();
+	struct file *file_p = curr_t->fdt[fd];
+	return file_length(file_p);
 }
 
 int
@@ -186,5 +207,9 @@ tell (int fd) {
 }
 
 void
-close (int fd) {
+close (int fd) {// FIXME: next_fd 갱신 로직 최적화
+	struct thread *curr_t = thread_current();
+	struct file *file_p = curr_t->fdt[fd];
+	file_close(file_p);
+	curr_t->fdt[fd] = NULL;
 }

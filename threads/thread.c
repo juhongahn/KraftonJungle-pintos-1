@@ -215,12 +215,11 @@ tid_t thread_create(const char *name, int priority,
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
+
 	/* allocate file descriptor table */
-	*t->fdt = palloc_get_page(PAL_ZERO); // ?
-
-	memset(*t->fdt, 0, sizeof(struct file*));
-	memset(*(t->fdt + sizeof(struct file*)), 0, sizeof(struct file*));
-
+	t->fdt = palloc_get_page(PAL_ZERO); // ?
+	t->fdt[0] = 1; // ? stdin
+	t->fdt[1] = 2; // ? stdout
 	t->next_fd = 2;
 
 	/* Add to run queue. */
