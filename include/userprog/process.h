@@ -2,7 +2,7 @@
 #define USERPROG_PROCESS_H
 /* for byte alignment */
 #define ALIGNMENT 8
-#define ADDR_SIZE 8
+#define ADDR_SIZE sizeof(void *)
 
 #include "threads/thread.h"
 
