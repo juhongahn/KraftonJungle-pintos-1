@@ -602,7 +602,7 @@ pass_arguments (int argc, char **argv, struct intr_frame *if_) {
     if (mod)
     {
         if_->rsp -= mod;
-        memset((void *)if_->rsp, 0, mod);
+        memset((uint8_t *)if_->rsp, 0, mod);
     }
 
 	/* null pointer sentinel (required by the C standard) */
