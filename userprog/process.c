@@ -606,14 +606,14 @@ pass_arguments (int argc, char **argv, struct intr_frame *if_) {
     }
 
 	/* null pointer sentinel (required by the C standard) */
-    if_->rsp -= ALIGNMENT;
-    memset((void *)if_->rsp, 0, ALIGNMENT);
+    if_->rsp -= CHARP_SIZE;
+    memset((void *)if_->rsp, 0, CHARP_SIZE);
 
 	/* 각 인자의 주소값을 스택에 넣기 */
     for (int i = argc - 1; i >= 0; i--)
     {   
-        if_->rsp -= ADDR_SIZE;
-        memcpy((void *)if_->rsp, &argv[i], ADDR_SIZE);
+        if_->rsp -= CHARP_SIZE;
+        memcpy((void *)if_->rsp, &argv[i], CHARP_SIZE);
     }
 
 	/* 마지막으로, 여느 스택 프레임과 동일한 구조를 갖추기 위해
