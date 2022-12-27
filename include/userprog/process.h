@@ -1,5 +1,9 @@
 #ifndef USERPROG_PROCESS_H
 #define USERPROG_PROCESS_H
+/* for byte alignment */
+#define ALIGNMENT 8
+#define ADDR_SIZE sizeof(void *)
+#define CHARP_SIZE sizeof(char *)
 
 #include "threads/thread.h"
 
