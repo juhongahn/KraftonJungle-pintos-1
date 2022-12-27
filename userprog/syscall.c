@@ -81,19 +81,27 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_CREATE:
-		create(f->R.rsi, f->R.rdi);
+		check_address(f->R.rsi);
+		bool success = create(f->R.rsi, f->R.rdi);
+		f->R.rax = success;
 		break;
 
 	case SYS_REMOVE:
-		remove(f->R.rsi);
+		check_address(f->R.rsi);
+		bool success = remove(f->R.rsi);
+		f->R.rax = success;
 		break;
 
 	case SYS_OPEN:
-		open(f->R.rsi);
+		check_address(f->R.rsi);
+		int fd = open(f->R.rsi);
+		f->R.rax = fd;
 		break;
 
 	case SYS_FILESIZE:
-		open(f->R.rsi);
+		check_address(f->R.rsi);
+		int file_size = filesize(f->R.rsi);
+		f->R.rax = file_size;
 		break;
 
 	case SYS_READ:
@@ -109,6 +117,7 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_CLOSE:
+		check_address(f->R.rsi);
 		close(f->R.rsi);
 		break;
 
@@ -136,6 +145,8 @@ check_address(void *addr) {
 		exit(-1);
 	}
 }
+
+// ! TODO: 시스템 콜의 반환값을 rax 레지스터에 저장하기
 
 void
 halt (void) {
