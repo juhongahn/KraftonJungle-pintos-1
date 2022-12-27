@@ -97,6 +97,8 @@ struct thread
 	struct list donations;	   /* 우선순위를 준 스레드 목록 */
 	struct list_elem d_elem;   /* 도너를 연결하기 위한 elem */
 	int old_priority;		   /* 도네이트 받기 전 우선순위 */
+	struct file **fdt;
+	int next_fd;
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem; /* List element. */
