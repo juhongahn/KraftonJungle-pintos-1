@@ -7,9 +7,28 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+#include "threads/init.h"
+#include "filesys/filesys.h"
+#include "filesys/file.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
+static void check_address(void *addr);
+
+static void halt (void) NO_RETURN;
+static void exit (int status) NO_RETURN;
+static pid_t fork (const char *thread_name);
+static int exec (const char *file);
+static int wait (pid_t);
+static bool create (const char *file, unsigned initial_size);
+static bool remove (const char *file);
+static int open (const char *file);
+static int filesize (int fd);
+static int read (int fd, void *buffer, unsigned length);
+static int write (int fd, const void *buffer, unsigned length);
+static void seek (int fd, unsigned position);
+static unsigned tell (int fd);
+static void close (int fd);
 
 /* System call.
  *
@@ -39,8 +58,133 @@ syscall_init (void) {
 
 /* The main system call interface */
 void
-syscall_handler (struct intr_frame *f UNUSED) {
-	// TODO: Your implementation goes here.
-	printf ("system call!\n");
+syscall_handler (struct intr_frame *f) {
+	/* 포인터 유효성 검증 */
+	check_address(f->rsp);
+
+	switch (f->R.rax)
+	{
+	case SYS_HALT:
+		halt();
+		break;
+
+	case SYS_EXIT:
+		break;
+
+	case SYS_FORK:
+		break;
+
+	case SYS_EXEC:
+		break;
+
+	case SYS_CREATE:
+		break;
+
+	case SYS_REMOVE:
+		break;
+
+	case SYS_OPEN:
+		break;
+
+	case SYS_FILESIZE:
+		break;
+
+	case SYS_READ:
+		break;
+
+	case SYS_WRITE:
+		break;
+
+	case SYS_SEEK:
+		break;
+
+	case SYS_TELL:
+		break;
+
+	case SYS_CLOSE:
+		break;
+
+	default:
+		break;
+	}
+
 	thread_exit ();
+}
+
+static void
+check_address(void *addr) {
+	// TODO:
+	// 1. 포인터 유효성 검증
+	//		<유효하지 않은 포인터>
+	//		- 널 포인터
+	//		- virtual memory와 매핑 안 된 영역
+	//		- 커널 가상 메모리 주소 공간을 가리키는 포인터 (=PHYS_BASE 위의 영역)
+	if (
+		!addr
+		|| pml4_get_page(thread_current()->pml4, addr)
+		|| is_kernel_vaddr(addr)
+	) {
+		// 2. 유저 영역을 벗어난 영역일 경우 프로세스 종료((exit(-1)))
+		exit(-1);
+	}
+}
+
+void
+halt (void) {
+	power_off();
+}
+
+void
+exit (int status) {
+	// TODO: blocked by wait
+}
+
+pid_t
+fork (const char *thread_name){
+}
+
+int
+exec (const char *file) {
+}
+
+int
+wait (pid_t pid) {
+}
+
+bool
+create (const char *file, unsigned initial_size) {
+	return filesys_create(file, initial_size);
+}
+
+bool
+remove (const char *file) {
+	return filesys_remove(file);
+}
+
+int
+open (const char *file) {
+}
+
+int
+filesize (int fd) {
+}
+
+int
+read (int fd, void *buffer, unsigned size) {
+}
+
+int
+write (int fd, const void *buffer, unsigned size) {
+}
+
+void
+seek (int fd, unsigned position) {
+}
+
+unsigned
+tell (int fd) {
+}
+
+void
+close (int fd) {
 }
