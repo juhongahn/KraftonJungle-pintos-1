@@ -188,11 +188,11 @@ process_exec (void *f_name) {
 	if (!success)
 		return -1;
 
-	struct thread *curr_thread = thread_current();
-	if (curr_thread->exec_sema != NULL)
-	{
-		sema_up(&curr_thread->parent->exec_sema);
-	}
+	// struct thread *curr_thread = thread_current();
+	// if (curr_thread->exec_sema != NULL)
+	// {
+	// 	sema_up(&curr_thread->parent->exec_sema);
+	// }
 
 	/* Start switched process. */
 	do_iret (&_if);
@@ -228,6 +228,7 @@ process_exit (void) {
 
 	struct thread *curr = thread_current ();
 	printf ("%s: exit(%d)\n", curr->name, curr->exit_status);
+	sema_up(&curr->wait_sema);
 	process_cleanup ();
 }
 

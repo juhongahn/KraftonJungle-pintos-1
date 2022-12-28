@@ -172,13 +172,33 @@ exec (const char *cmd_line) {
 		return -1;
 	}
 	struct thread *curr_thread = thread_current();
-	sema_down(&curr_thread->exec_sema);
+	//sema_down(&curr_thread->exec_sema);
 	return tid;
 }
 
 int
 wait (pid_t pid) {
+	struct thread *curr_thread = thread_current();
+	struct list *child_list = &curr_thread->child_list;
+	struct thread *child_thread;
+	struct list_elem *e;
+
+	for (e = list_begin(child_list); e != list_end(child_list); e = list_next(e))
+	{
+		struct thread *tmp_thread = list_entry(e, struct thread, child_elem);
+		if (tmp_thread->tid == pid)
+		{
+			child_thread = tmp_thread;
+			break;
+		}
+	}
+	if (child_thread == NULL)
+		return -1;
 	
+	sema_down(&child_thread->wait_sema);
+	list_remove(&child_thread->child_elem);
+	int child_exit_status = child_thread->exit_status;
+	return child_exit_status != 0 ? -1 : child_exit_status;
 }
 
 bool

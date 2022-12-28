@@ -103,7 +103,7 @@ struct thread
 	struct thread *parent;     /* 부모 프로세스 포인터 */
 	struct list child_list;	   /* 자식 프로세스 리스트 */
 	struct list_elem child_elem;
-	struct semaphore *exec_sema;	/* 자식 프로세스가 탑재될 때 까지 대기 */
+	struct semaphore *wait_sema;	/* 자식 프로세스가 탑재될 때 까지 대기 */
 	int is_exit;
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem; /* List element. */
