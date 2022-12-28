@@ -187,7 +187,13 @@ process_exec (void *f_name) {
 	palloc_free_page (file_name);
 	if (!success)
 		return -1;
-	
+
+	struct thread *curr_thread = thread_current();
+	if (curr_thread->exec_sema != NULL)
+	{
+		sema_up(&curr_thread->parent->exec_sema);
+	}
+
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
@@ -205,7 +211,7 @@ process_exec (void *f_name) {
  * does nothing. */
 int
 process_wait (tid_t child_tid UNUSED) {
-	for (int i =0; i < 100000; i++);
+	while(1);
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
@@ -215,12 +221,13 @@ process_wait (tid_t child_tid UNUSED) {
 /* Exit the process. This function is called by thread_exit (). */
 void
 process_exit (void) {
-	struct thread *curr = thread_current ();
 	/* TODO: Your code goes here.
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
+	struct thread *curr = thread_current ();
+	printf ("%s: exit(%d)\n", curr->name, curr->exit_status);
 	process_cleanup ();
 }
 

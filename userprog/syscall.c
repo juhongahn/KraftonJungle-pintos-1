@@ -155,7 +155,9 @@ halt (void) {
 
 void
 exit (int status) {
+	thread_current()->exit_status = status;
 	// TODO: blocked by wait
+	thread_exit();
 }
 
 pid_t
@@ -163,11 +165,20 @@ fork (const char *thread_name){
 }
 
 int
-exec (const char *file) {
+exec (const char *cmd_line) {
+	tid_t tid = process_create_initd(cmd_line);
+	if (tid == -1)
+	{
+		return -1;
+	}
+	struct thread *curr_thread = thread_current();
+	sema_down(&curr_thread->exec_sema);
+	return tid;
 }
 
 int
 wait (pid_t pid) {
+	
 }
 
 bool

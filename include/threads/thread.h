@@ -99,7 +99,12 @@ struct thread
 	int old_priority;		   /* 도네이트 받기 전 우선순위 */
 	struct file **fdt;     	   /* File Descriptor Table */
 	int next_fd;               /* 다음에 fd를 넣을 자리 */
-
+	int exit_status;		   /* 프로세스 종료 상태 */
+	struct thread *parent;     /* 부모 프로세스 포인터 */
+	struct list child_list;	   /* 자식 프로세스 리스트 */
+	struct list_elem child_elem;
+	struct semaphore *exec_sema;	/* 자식 프로세스가 탑재될 때 까지 대기 */
+	int is_exit;
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem; /* List element. */
 
