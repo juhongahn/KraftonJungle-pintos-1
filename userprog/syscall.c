@@ -83,38 +83,37 @@ syscall_handler (struct intr_frame *f) {
 
 	case SYS_CREATE:
 		check_address(f->R.rsi);
-		bool success = create(f->R.rsi, f->R.rdi);
-		f->R.rax = success;
+		f->R.rax = create(f->R.rsi, f->R.rdi);
 		break;
 
 	case SYS_REMOVE:
 		check_address(f->R.rsi);
-		bool success = remove(f->R.rsi);
-		f->R.rax = success;
+		f->R.rax = remove(f->R.rsi);
 		break;
 
 	case SYS_OPEN:
 		check_address(f->R.rsi);
-		int fd = open(f->R.rsi);
-		f->R.rax = fd;
+		f->R.rax = open(f->R.rsi);
 		break;
 
 	case SYS_FILESIZE:
-		check_address(f->R.rsi);
-		int file_size = filesize(f->R.rsi);
-		f->R.rax = file_size;
+		f->R.rax = filesize(f->R.rsi);
 		break;
 
 	case SYS_READ:
+		f->R.rax = read(f->R.rsi, f->R.rdi, f->R.rdx);
 		break;
 
 	case SYS_WRITE:
+		f->R.rax = write(f->R.rsi, f->R.rdi, f->R.rdx);
 		break;
 
 	case SYS_SEEK:
+		seek(f->R.rsi, f->R.rdi);
 		break;
 
 	case SYS_TELL:
+		f->R.rax = tell(f->R.rsi);
 		break;
 
 	case SYS_CLOSE:
@@ -199,67 +198,115 @@ int
 filesize (int fd) {
 	struct thread *curr_t = thread_current();
 	struct file *file_p = curr_t->fdt[fd];
+	if (file_p == NULL) {
+		return -1;
+	}
 	return file_length(file_p);
 }
 
 int
 read (int fd, void *buffer, unsigned size) {
-
-	/* 파일 디스크립터에 해당하는 파일을 가져와야한다. */
-	struct thread *curr_thread = thread_current();
-	struct file **fdt = cur_thread->fdt;
-	if (fd == 0)
-	{
-		buffer = (char*)buffer;
+	
+	if (fd == STDIN_FILENO)
+	{	
+		int i;
 		uint8_t key;
-		for (int i=0; i<size; i++)
+		for (i=0; i<size; i++)
 		{
 			key = input_getc();
-			*buffer++ = key;
+			*(char *)buffer++ = key;
 			if (key == '\0')
+			{
+				i++;
 				break;
+			}
 		}
+		return i;
 	}
-	else if (fd == 1)
+	else if (fd == STDOUT_FILENO)
 	{
 		return -1;
 	}
 	else
 	{
+		/* 파일 디스크립터에 해당하는 파일을 가져와야한다. */
+		struct thread *curr_thread = thread_current();
+		struct file **fdt = curr_thread->fdt;
+		// TODO: lock acquire failed
 		struct file *curr_file = fdt[fd];
-
-		if (file == NULL)
-			return -1;
-		if (curr_file->inode->open_cnt == 0)
-			lock_acquire(curr_file->write_lock);
-
-		lock_acquire(curr_file->read_lock);
-		curr_file->inode->open_cnt++;
-		lock_release(curr_file->read_lock);
-
+		lock_acquire(&filesys_lock);
 		off_t read_size = file_read(curr_file, buffer, size);
-		
-		lock_acquire(curr_file->read_lock);
-		curr_file->inode->open_cnt--;
-		lock_release(curr_file->read_lock);
+		lock_release(&filesys_lock);
 
-		if (curr_file->inode->open_cnt == 0)
-			lock_release(curr_file->write_lock);
+		// if (file == NULL)
+		// 	return -1;
+		// if (curr_file->inode->open_cnt == 0)
+		// 	lock_acquire(curr_file->write_lock);
+
+		// lock_acquire(curr_file->read_lock);
+		// curr_file->inode->open_cnt++;
+		// lock_release(curr_file->read_lock);
+
+		
+		// lock_acquire(curr_file->read_lock);
+		// curr_file->inode->open_cnt--;
+		// lock_release(curr_file->read_lock);
+
+		// if (curr_file->inode->open_cnt == 0)
+		// 	lock_release(curr_file->write_lock);
+
+		return read_size;
+
 	}
 	
-	return read_size;
 }
 
 int
 write (int fd, const void *buffer, unsigned size) {
+
+	if (fd == STDOUT_FILENO)
+	{
+		putbuf(buffer, size);
+		return size;
+	}
+	else if (fd == STDIN_FILENO)
+	{
+		return 0;
+	}
+	else
+	{
+		struct thread *curr_thread = thread_current();
+		struct file **fdt = curr_thread->fdt;
+		struct file *curr_file = fdt[fd];
+		if (curr_file == NULL)
+		{
+			return 0;
+		}
+		lock_acquire(&filesys_lock);
+		off_t write_size = file_write(curr_file, buffer, size);
+		lock_release(&filesys_lock);
+		return write_size;
+	}
+	
+
+
 }
 
 void
 seek (int fd, unsigned position) {
+	struct thread *curr_thread = thread_current();
+	struct file **fdt = curr_thread->fdt;
+	struct file *curr_file = fdt[fd];
+	
+	file_seek (curr_file, position);
 }
 
 unsigned
 tell (int fd) {
+	struct thread *curr_thread = thread_current();
+	struct file **fdt = curr_thread->fdt;
+	struct file *curr_file = fdt[fd];
+	return file_tell(curr_file);
 }
 
 void
