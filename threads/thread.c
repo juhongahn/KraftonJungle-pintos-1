@@ -216,9 +216,6 @@ tid_t thread_create(const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
-	t->exit_status = 0;
-	sema_init(&t->wait_sema, 0);
-
 	/* allocate file descriptor table */
 	t->fdt = palloc_get_page(PAL_ZERO); // ?
 	t->fdt[0] = 1; // ? stdin
@@ -300,7 +297,7 @@ tid_t thread_tid(void)
 	return thread_current()->tid;
 }
 
-/* Deschedules the current thread and destroys it.  Never
+/* Deschedules the current thread and destroys it. Never
    returns to the caller. */
 void thread_exit(void)
 {
@@ -450,6 +447,13 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->wait_on_lock = NULL;
 	list_init(&t->donations);
 	t->old_priority = priority;
+
+	/* project 2 관련 초기화 */
+	t->exit_status = 0;
+	sema_init(&t->wait_sema, 0);
+	t->parent = NULL;
+	list_init(&t->child_list);
+
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

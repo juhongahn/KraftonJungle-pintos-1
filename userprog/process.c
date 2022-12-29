@@ -44,7 +44,7 @@ tid_t
 process_create_initd (const char *file_name) {
 	char *fn_copy;
 	tid_t tid;
-
+	
 	/* Make a copy of FILE_NAME.
 	 * Otherwise there's a race between the caller and load(). */
 	fn_copy = palloc_get_page (0);
@@ -212,6 +212,34 @@ process_exec (void *f_name) {
 int
 process_wait (tid_t child_tid UNUSED) {
 	while(1);
+	struct thread *curr_thread = thread_current();
+	struct list *child_list = &curr_thread->child_list;
+	/* child가 있어야  */
+	if (!list_empty(child_list))
+	{
+		struct thread *child_thread;
+		struct list_elem *e;
+
+		for (e = list_begin(child_list); e != list_end(child_list); e = list_next(e))
+		{
+			struct thread *tmp_thread = list_entry(e, struct thread, child_elem);
+			if (tmp_thread->tid == child_tid)
+			{
+				child_thread = tmp_thread;
+				break;
+			}
+		}
+		
+		if (child_thread == NULL)
+			return -1;
+		
+		sema_down(&child_thread->wait_sema);
+		list_remove(&child_thread->child_elem);
+		int child_exit_status = child_thread->exit_status;
+		return child_exit_status != 0 ? -1 : child_exit_status;
+	}
+	
+
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
@@ -228,7 +256,8 @@ process_exit (void) {
 
 	struct thread *curr = thread_current ();
 	printf ("%s: exit(%d)\n", curr->name, curr->exit_status);
-	sema_up(&curr->wait_sema);
+	if (curr->parent != NULL)
+		sema_up(&curr->wait_sema);
 	process_cleanup ();
 }
 
@@ -346,6 +375,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	char *argv[64] = {NULL, };
 	int argc;
 	argc = parse_file_name(argv, file_name);
+	printf("====file_name: %s ====\n", argv[0]);
 
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();

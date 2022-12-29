@@ -155,8 +155,9 @@ halt (void) {
 
 void
 exit (int status) {
-	thread_current()->exit_status = status;
 	// TODO: blocked by wait
+
+	thread_current()->exit_status = status;
 	thread_exit();
 }
 
@@ -167,38 +168,19 @@ fork (const char *thread_name){
 int
 exec (const char *cmd_line) {
 	tid_t tid = process_create_initd(cmd_line);
-	if (tid == -1)
+	struct thread *curr_thread = thread_current();
+
+	if (tid == TID_ERROR)
 	{
 		return -1;
 	}
-	struct thread *curr_thread = thread_current();
+	wait(tid);
 	//sema_down(&curr_thread->exec_sema);
-	return tid;
 }
 
 int
 wait (pid_t pid) {
-	struct thread *curr_thread = thread_current();
-	struct list *child_list = &curr_thread->child_list;
-	struct thread *child_thread;
-	struct list_elem *e;
-
-	for (e = list_begin(child_list); e != list_end(child_list); e = list_next(e))
-	{
-		struct thread *tmp_thread = list_entry(e, struct thread, child_elem);
-		if (tmp_thread->tid == pid)
-		{
-			child_thread = tmp_thread;
-			break;
-		}
-	}
-	if (child_thread == NULL)
-		return -1;
-	
-	sema_down(&child_thread->wait_sema);
-	list_remove(&child_thread->child_elem);
-	int child_exit_status = child_thread->exit_status;
-	return child_exit_status != 0 ? -1 : child_exit_status;
+	process_wait(pid);
 }
 
 bool
