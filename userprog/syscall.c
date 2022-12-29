@@ -62,7 +62,6 @@ syscall_init (void) {
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f) {
-	// FIXME: 검증 대상 변경, 위치 변경
 	/* 포인터 유효성 검증 */
 	check_address(f->rsp);
 
@@ -73,12 +72,20 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_EXIT:
+		exit(f->R.rsi);
+		break;
+
+	case SYS_WAIT:
+		printf("========= wait pid: %d\n", f->R.rsi);
+		f->R.rax = wait(f->R.rsi);
 		break;
 
 	case SYS_FORK:
 		break;
 
 	case SYS_EXEC:
+		check_address(f->R.rsi);
+		f->R.rax = exec(f->R.rsi);
 		break;
 
 	case SYS_CREATE:
@@ -180,7 +187,7 @@ exec (const char *cmd_line) {
 
 int
 wait (pid_t pid) {
-	process_wait(pid);
+	return process_wait(pid);
 }
 
 bool
