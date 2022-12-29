@@ -31,6 +31,7 @@ static int write (int fd, const void *buffer, unsigned length);
 static void seek (int fd, unsigned position);
 static unsigned tell (int fd);
 static void close (int fd);
+static bool is_invalid_fd(int fd);
 
 /* System call.
  *
@@ -106,10 +107,14 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_READ:
+		//check_address(f->R.rdi);
+		check_address(f->R.rsi);
 		f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
 		break;
 
 	case SYS_WRITE:
+		//check_address(f->R.rdi);
+		check_address(f->R.rsi);
 		f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
 		break;
 
@@ -141,7 +146,7 @@ check_address(void *addr) {
 	//		- 커널 가상 메모리 주소 공간을 가리키는 포인터 (=PHYS_BASE 위의 영역)
 	if (
 		!addr
-		|| pml4_get_page(thread_current()->pml4, addr)
+		|| !pml4_get_page(thread_current()->pml4, addr)
 		|| is_kernel_vaddr(addr)
 	) {
 		// 2. 유저 영역을 벗어난 영역일 경우 프로세스 종료((exit(-1)))
@@ -221,7 +226,7 @@ filesize (int fd) {
 
 int
 read (int fd, void *buffer, unsigned size) {
-	
+
 	if (fd == STDIN_FILENO)
 	{	
 		int i;
@@ -238,42 +243,29 @@ read (int fd, void *buffer, unsigned size) {
 		}
 		return i;
 	}
+	else if (is_invalid_fd(fd)) {
+		return -1;
+	}
 	else if (fd == STDOUT_FILENO)
 	{
 		return -1;
 	}
 	else
-	{
+	{	
 		/* 파일 디스크립터에 해당하는 파일을 가져와야한다. */
 		struct thread *curr_thread = thread_current();
 		struct file **fdt = curr_thread->fdt;
 		// TODO: lock acquire failed
 		struct file *curr_file = fdt[fd];
+		if (curr_file == NULL)
+		{
+			return -1;
+		}
 		lock_acquire(&filesys_lock);
 		off_t read_size = file_read(curr_file, buffer, size);
 		lock_release(&filesys_lock);
-
-		// if (file == NULL)
-		// 	return -1;
-		// if (curr_file->inode->open_cnt == 0)
-		// 	lock_acquire(curr_file->write_lock);
-
-		// lock_acquire(curr_file->read_lock);
-		// curr_file->inode->open_cnt++;
-		// lock_release(curr_file->read_lock);
-
-		
-		// lock_acquire(curr_file->read_lock);
-		// curr_file->inode->open_cnt--;
-		// lock_release(curr_file->read_lock);
-
-		// if (curr_file->inode->open_cnt == 0)
-		// 	lock_release(curr_file->write_lock);
-
 		return read_size;
-
 	}
-	
 }
 
 int
@@ -281,22 +273,27 @@ write (int fd, const void *buffer, unsigned size) {
 
 	struct thread *curr_thread = thread_current();
 	struct file **fdt = curr_thread->fdt;
-	struct file *fileobj = fdt[fd];
+	struct file *curr_file = fdt[fd];
 	int read_count;
 
-	if (fd == 1) {
+	if (curr_file == NULL)
+	{
+		return 0;
+	}
+
+	if (fd == STDOUT_FILENO) {
 		putbuf(buffer, size);
 		read_count = size;
 	}	
-	
 	else if (fd == STDIN_FILENO) {
-		return -1;
+		return 0;
 	}
-
+	else if (is_invalid_fd(fd)) {
+		return 0;
+	}
 	else {
-
 		lock_acquire(&filesys_lock);
-		read_count = file_write(fileobj, buffer, size);
+		read_count = file_write(curr_file, buffer, size);
 		lock_release(&filesys_lock);
 	}
 	return read_count;
@@ -325,4 +322,18 @@ close (int fd) {// FIXME: next_fd 갱신 로직 최적화
 	struct file *file_p = curr_t->fdt[fd];
 	file_close(file_p);
 	curr_t->fdt[fd] = NULL;
+}
+
+bool
+is_invalid_fd(int fd)
+{
+	// TODO: fd 최대값 구하기
+	if (fd < 0 || fd > 512)
+	{
+		return 1;
+	}
+	else
+	{
+		return 0;
+	}
 }

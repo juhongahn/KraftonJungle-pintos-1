@@ -258,11 +258,12 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-
 	struct thread *curr = thread_current ();
-	printf ("%s: exit(%d)\n",curr->name, curr->exit_status);
+	#ifdef USERPROG
+		printf ("%s: exit(%d)\n",curr->name, curr->exit_status);
+	#endif
 	if (curr->parent != NULL)
-		sema_up(&curr->wait_sema);
+			sema_up(&curr->wait_sema);
 	process_cleanup ();
 }
 
