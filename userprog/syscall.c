@@ -63,8 +63,7 @@ syscall_init (void) {
 void
 syscall_handler (struct intr_frame *f) {
 	/* 포인터 유효성 검증 */
-	check_address(f->rsp);
-
+	
 	switch (f->R.rax)
 	{
 	case SYS_HALT:
@@ -72,67 +71,64 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_EXIT:
-		exit(f->R.rsi);
+		exit(f->R.rdi);
 		break;
 
 	case SYS_WAIT:
-		printf("========= wait pid: %d\n", f->R.rsi);
-		f->R.rax = wait(f->R.rsi);
+		f->R.rax = wait(f->R.rdi);
 		break;
 
 	case SYS_FORK:
 		break;
 
 	case SYS_EXEC:
-		check_address(f->R.rsi);
-		f->R.rax = exec(f->R.rsi);
+		check_address(f->R.rdi);
+		f->R.rax = exec(f->R.rdi);
 		break;
 
 	case SYS_CREATE:
-		check_address(f->R.rsi);
-		f->R.rax = create(f->R.rsi, f->R.rdi);
+		check_address(f->R.rdi);
+		f->R.rax = create(f->R.rdi, f->R.rsi);
 		break;
 
 	case SYS_REMOVE:
-		check_address(f->R.rsi);
-		f->R.rax = remove(f->R.rsi);
+		check_address(f->R.rdi);
+		f->R.rax = remove(f->R.rdi);
 		break;
 
 	case SYS_OPEN:
-		check_address(f->R.rsi);
-		f->R.rax = open(f->R.rsi);
+		check_address(f->R.rdi);
+		f->R.rax = open(f->R.rdi);
 		break;
 
 	case SYS_FILESIZE:
-		f->R.rax = filesize(f->R.rsi);
+		f->R.rax = filesize(f->R.rdi);
 		break;
 
 	case SYS_READ:
-		f->R.rax = read(f->R.rsi, f->R.rdi, f->R.rdx);
+		f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
 		break;
 
 	case SYS_WRITE:
-		f->R.rax = write(f->R.rsi, f->R.rdi, f->R.rdx);
+		f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
 		break;
 
 	case SYS_SEEK:
-		seek(f->R.rsi, f->R.rdi);
+		seek(f->R.rdi, f->R.rsi);
 		break;
 
 	case SYS_TELL:
-		f->R.rax = tell(f->R.rsi);
+		f->R.rax = tell(f->R.rdi);
 		break;
 
 	case SYS_CLOSE:
-		check_address(f->R.rsi);
-		close(f->R.rsi);
+		check_address(f->R.rdi);
+		close(f->R.rdi);
 		break;
 
 	default:
-		break;
+		thread_exit ();
 	}
-
-	thread_exit ();
 }
 
 static void
@@ -163,7 +159,6 @@ halt (void) {
 void
 exit (int status) {
 	// TODO: blocked by wait
-
 	thread_current()->exit_status = status;
 	thread_exit();
 }
@@ -182,7 +177,6 @@ exec (const char *cmd_line) {
 		return -1;
 	}
 	wait(tid);
-	//sema_down(&curr_thread->exec_sema);
 }
 
 int
@@ -202,6 +196,7 @@ remove (const char *file) {
 
 int
 open (const char *file) {
+
 	struct thread *curr_t = thread_current();
 	struct file *f = filesys_open(file);
 
@@ -284,32 +279,27 @@ read (int fd, void *buffer, unsigned size) {
 int
 write (int fd, const void *buffer, unsigned size) {
 
-	if (fd == STDOUT_FILENO)
-	{
+	struct thread *curr_thread = thread_current();
+	struct file **fdt = curr_thread->fdt;
+	struct file *fileobj = fdt[fd];
+	int read_count;
+
+	if (fd == 1) {
 		putbuf(buffer, size);
-		return size;
-	}
-	else if (fd == STDIN_FILENO)
-	{
-		return 0;
-	}
-	else
-	{
-		struct thread *curr_thread = thread_current();
-		struct file **fdt = curr_thread->fdt;
-		struct file *curr_file = fdt[fd];
-		if (curr_file == NULL)
-		{
-			return 0;
-		}
-		lock_acquire(&filesys_lock);
-		off_t write_size = file_write(curr_file, buffer, size);
-		lock_release(&filesys_lock);
-		return write_size;
-	}
+		read_count = size;
+	}	
 	
+	else if (fd == STDIN_FILENO) {
+		return -1;
+	}
 
+	else {
 
+		lock_acquire(&filesys_lock);
+		read_count = file_write(fileobj, buffer, size);
+		lock_release(&filesys_lock);
+	}
+	return read_count;
 }
 
 void

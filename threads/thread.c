@@ -191,8 +191,8 @@ tid_t thread_create(const char *name, int priority,
 {
 	struct thread *t;
 	tid_t tid;
-	struct thread *curr_thread;
 	struct file **fdt;
+	struct thread *curr_thread = thread_current();
 
 	ASSERT(function != NULL);
 
@@ -222,8 +222,15 @@ tid_t thread_create(const char *name, int priority,
 	t->fdt[1] = 2; // ? stdout
 	t->next_fd = 2;
 
+	/* 자식 쓰레드에 부모 쓰레드 저장 */
+	t->parent = curr_thread;
+
 	/* Add to run queue. */
 	thread_unblock(t);
+
+	/* Add child to parent thread */
+	list_push_back(&curr_thread->child_list, &t->child_elem);
+
 	/* 현재 실행 중인 쓰레드보다 우선순위가 더 높을 경우 선점 */
 	test_max_priority();
 

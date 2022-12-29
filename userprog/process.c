@@ -18,6 +18,7 @@
 #include "threads/mmu.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -52,8 +53,12 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
+	char *argv[64] = {NULL, };
+	int argc;
+	argc = parse_file_name(argv, file_name);
+
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
+	tid = thread_create (argv[0], PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
 	return tid;
@@ -181,7 +186,7 @@ process_exec (void *f_name) {
 	/* And then load the binary */
 	success = load (file_name, &_if);
 
-	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+	//hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
 
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
@@ -211,10 +216,10 @@ process_exec (void *f_name) {
  * does nothing. */
 int
 process_wait (tid_t child_tid UNUSED) {
-	while(1);
+
 	struct thread *curr_thread = thread_current();
 	struct list *child_list = &curr_thread->child_list;
-	/* child가 있어야  */
+
 	if (!list_empty(child_list))
 	{
 		struct thread *child_thread;
@@ -236,26 +241,26 @@ process_wait (tid_t child_tid UNUSED) {
 		sema_down(&child_thread->wait_sema);
 		list_remove(&child_thread->child_elem);
 		int child_exit_status = child_thread->exit_status;
-		return child_exit_status != 0 ? -1 : child_exit_status;
+
+		return child_exit_status;
 	}
 	
-
-	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
-	 * XXX:       to add infinite loop here before
-	 * XXX:       implementing the process_wait. */
-	return -1;
+	// // /* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
+	// //  * XXX:       to add infinite loop here before
+	// //  * XXX:       implementing the process_wait. */
 }
 
 /* Exit the process. This function is called by thread_exit (). */
 void
 process_exit (void) {
+
 	/* TODO: Your code goes here.
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
 	struct thread *curr = thread_current ();
-	printf ("%s: exit(%d)\n", curr->name, curr->exit_status);
+	printf ("%s: exit(%d)\n",curr->name, curr->exit_status);
 	if (curr->parent != NULL)
 		sema_up(&curr->wait_sema);
 	process_cleanup ();
@@ -375,7 +380,6 @@ load (const char *file_name, struct intr_frame *if_) {
 	char *argv[64] = {NULL, };
 	int argc;
 	argc = parse_file_name(argv, file_name);
-	printf("====file_name: %s ====\n", argv[0]);
 
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
