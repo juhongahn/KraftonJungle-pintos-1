@@ -194,10 +194,7 @@ process_exec (void *f_name) {
 		return -1;
 
 	// struct thread *curr_thread = thread_current();
-	// if (curr_thread->exec_sema != NULL)
-	// {
-	// 	sema_up(&curr_thread->parent->exec_sema);
-	// }
+	// sema_up(&curr_thread->wait_sema);
 
 	/* Start switched process. */
 	do_iret (&_if);
@@ -215,9 +212,9 @@ process_exec (void *f_name) {
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) {
+process_wait (tid_t child_tid) {
 
-	struct thread *curr_thread = thread_current();
+	struct thread *curr_thread = thread_current();	/* 부모 쓰레드 */
 	struct list *child_list = &curr_thread->child_list;
 
 	if (!list_empty(child_list))
@@ -237,17 +234,14 @@ process_wait (tid_t child_tid UNUSED) {
 		
 		if (child_thread == NULL)
 			return -1;
-		
-		sema_down(&child_thread->wait_sema);
-		list_remove(&child_thread->child_elem);
-		int child_exit_status = child_thread->exit_status;
+		//printf("===== waiting thread name: %s =====\n", thread_current()->name); 
+		// sema_down(&child_thread->wait_sema);
+		// list_remove(&child_thread->child_elem);
 
-		return child_exit_status;
+		return child_thread->exit_status;
 	}
-	
-	// // /* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
-	// //  * XXX:       to add infinite loop here before
-	// //  * XXX:       implementing the process_wait. */
+
+	return -1;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -259,9 +253,9 @@ process_exit (void) {
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	struct thread *curr = thread_current ();
-	#ifdef USERPROG
-		printf ("%s: exit(%d)\n",curr->name, curr->exit_status);
-	#endif
+	// #ifdef USERPROG
+	// 	printf ("%s: exit(%d)\n",curr->name, curr->exit_status);
+	// #endif
 	if (curr->parent != NULL)
 			sema_up(&curr->wait_sema);
 	process_cleanup ();

@@ -83,8 +83,10 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_EXEC:
-		check_address(f->R.rdi);
+		//check_address(f->R.rdi);
+		printf("==== exec called\n ====");
 		f->R.rax = exec(f->R.rdi);
+		
 		break;
 
 	case SYS_CREATE:
@@ -127,7 +129,6 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_CLOSE:
-		check_address(f->R.rdi);
 		close(f->R.rdi);
 		break;
 
@@ -164,7 +165,9 @@ halt (void) {
 void
 exit (int status) {
 	// TODO: blocked by wait
-	thread_current()->exit_status = status;
+	struct thread *curr = thread_current();
+	curr->exit_status = status;
+	printf ("%s: exit(%d)\n",curr->name, curr->exit_status);
 	thread_exit();
 }
 
@@ -174,13 +177,9 @@ fork (const char *thread_name){
 
 int
 exec (const char *cmd_line) {
+	printf("==== parent thread name: %s\n ======", thread_current()->name); 
 	tid_t tid = process_create_initd(cmd_line);
-	struct thread *curr_thread = thread_current();
 
-	if (tid == TID_ERROR)
-	{
-		return -1;
-	}
 	wait(tid);
 }
 
@@ -271,19 +270,10 @@ read (int fd, void *buffer, unsigned size) {
 int
 write (int fd, const void *buffer, unsigned size) {
 
-	struct thread *curr_thread = thread_current();
-	struct file **fdt = curr_thread->fdt;
-	struct file *curr_file = fdt[fd];
-	int read_count;
-
-	if (curr_file == NULL)
-	{
-		return 0;
-	}
 
 	if (fd == STDOUT_FILENO) {
 		putbuf(buffer, size);
-		read_count = size;
+		return size;
 	}	
 	else if (fd == STDIN_FILENO) {
 		return 0;
@@ -291,12 +281,22 @@ write (int fd, const void *buffer, unsigned size) {
 	else if (is_invalid_fd(fd)) {
 		return 0;
 	}
-	else {
+	else 
+	{
+		int read_count;
+		struct thread *curr_thread = thread_current();
+		struct file **fdt = curr_thread->fdt;
+		struct file *curr_file = fdt[fd];
+
+		if (curr_file == NULL)
+		{
+			return 0;
+		}
 		lock_acquire(&filesys_lock);
 		read_count = file_write(curr_file, buffer, size);
 		lock_release(&filesys_lock);
+		return read_count;
 	}
-	return read_count;
 }
 
 void
@@ -318,10 +318,16 @@ tell (int fd) {
 
 void
 close (int fd) {// FIXME: next_fd 갱신 로직 최적화
-	struct thread *curr_t = thread_current();
-	struct file *file_p = curr_t->fdt[fd];
-	file_close(file_p);
-	curr_t->fdt[fd] = NULL;
+	if (!is_invalid_fd(fd))
+	{	
+		struct thread *curr = thread_current();
+		struct file *file_p = curr->fdt[fd];
+		if (!file_p == NULL)
+		{
+			file_close(file_p);
+			curr->fdt[fd] = NULL;
+		}
+	}
 }
 
 bool
