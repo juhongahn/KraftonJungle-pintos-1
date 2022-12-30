@@ -19,7 +19,7 @@ void syscall_handler (struct intr_frame *);
 static void check_address(void *addr);
 
 static void halt (void) NO_RETURN;
-static void exit (int status) NO_RETURN;
+void exit (int status) NO_RETURN;
 static pid_t fork (const char *thread_name);
 static int exec (const char *file);
 static int wait (pid_t pid);
