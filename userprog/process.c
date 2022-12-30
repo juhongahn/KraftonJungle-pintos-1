@@ -178,13 +178,15 @@ __do_fork (void *aux) {
 	 * TODO:       the resources of parent.*/
 	struct file **parent_fdt = parent->fdt;
 	struct file **child_fdt = current->fdt;
-
+	child_fdt[0] = 1;
+	child_fdt[1] = 2;
 	for (int i = 2; i < 512; i++) {
 		struct file *f = parent_fdt[i];
 		if (f) {
 			child_fdt[i] = file_duplicate(f);
 		}
 	}
+	current->next_fd = parent->next_fd;
 
 	process_init ();
 
