@@ -33,6 +33,7 @@ static void seek (int fd, unsigned position);
 static unsigned tell (int fd);
 static void close (int fd);
 static bool is_invalid_fd(int fd);
+static void intr_frame_cpy(struct intr_frame *f);
 
 /* System call.
  *
@@ -65,6 +66,7 @@ syscall_init (void) {
 void
 syscall_handler (struct intr_frame *f) {
 	/* 포인터 유효성 검증 */
+	struct thread *curr_thread = thread_current();
 	
 	switch (f->R.rax)
 	{
@@ -82,6 +84,7 @@ syscall_handler (struct intr_frame *f) {
 
 	case SYS_FORK:
 		check_address(f->R.rdi);
+		intr_frame_cpy(f);
 		f->R.rax = fork(f->R.rdi);
 		break;
 
@@ -164,7 +167,6 @@ halt (void) {
 
 void
 exit (int status) {
-	// TODO: blocked by wait
 	struct thread *curr = thread_current();
 	curr->exit_status = status;
 	printf ("%s: exit(%d)\n",curr->name, curr->exit_status);
@@ -173,7 +175,7 @@ exit (int status) {
 
 pid_t
 fork (const char *thread_name) {
-	pid_t pid = process_fork(thread_name);
+	pid_t pid = process_fork(thread_name, &thread_current()->user_tf);
 	return pid;
 }
 
@@ -351,4 +353,18 @@ is_invalid_fd(int fd)
 	{
 		return 0;
 	}
+}
+
+void
+intr_frame_cpy(struct intr_frame *f) {
+	struct thread *curr_thread = thread_current();
+
+	// curr_thread->tf.R.rbx = f->R.rbx;
+	// curr_thread->tf.rsp = f->rsp;
+	// curr_thread->tf.R.rbp = f->R.rbp;
+	// curr_thread->tf.R.r12 = f->R.r12;
+	// curr_thread->tf.R.r13 = f->R.r13;
+	// curr_thread->tf.R.r14 = f->R.r14;
+	// curr_thread->tf.R.r15 = f->R.r15;
+	memcpy(&curr_thread->user_tf, f, sizeof(struct intr_frame));
 }

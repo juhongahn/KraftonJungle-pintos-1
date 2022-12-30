@@ -83,11 +83,18 @@ initd (void *f_name) {
 /* Clones the current process as `name`. Returns the new process's thread id, or
  * TID_ERROR if the thread cannot be created. */
 tid_t
-process_fork (const char *name, struct intr_frame *if_ UNUSED) {
+process_fork (const char *name, struct intr_frame *if_) {
 	struct thread *curr_thread = thread_current ();
+	curr_thread->user_tf = *if_;
 	/* Clone current thread to new thread.*/
 	tid_t tid = thread_create (name,
 			PRI_DEFAULT, __do_fork, curr_thread);
+
+	// TODO:
+	if (tid == -1) {
+		return TID_ERROR;
+	}
+
 	sema_down(&curr_thread->fork_sema);
 
 	return tid;
@@ -118,7 +125,8 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
 	memcpy(new_page, parent_page, PGSIZE);
-	writable = is_writable(pml4e_walk(parent->pml4, parent_page, 0));
+	// writable = is_writable(pml4e_walk(parent->pml4, parent_page, 0));
+	writable = is_writable(pte);
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
@@ -139,9 +147,8 @@ __do_fork (void *aux) {
 	struct intr_frame if_;
 	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current (); // 자식 쓰레드
-	// ! 구현
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if = &current->tf;
+	struct intr_frame *parent_if = &parent->user_tf;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
@@ -174,7 +181,7 @@ __do_fork (void *aux) {
 	for (int i = 2; i < 512; i++) {
 		struct file *f = parent_fdt[i];
 		if (f) {
-			child_fdt[i] = f;
+			child_fdt[i] = file_duplicate(f);
 		}
 	}
 
