@@ -106,6 +106,7 @@ struct thread
 	struct list_elem child_elem;
 	struct semaphore wait_sema;	/* 자식 프로세스가 종료될 때 까지 대기 */
 	struct semaphore fork_sema;	/* 자식 프로세스가 파일을 전부 복제할 때 까지 대기 */
+	struct semaphore free_sema;	/* 자식 프로세스가 파일을 전부 복제할 때 까지 대기 */
 	struct intr_frame user_tf;  /* Save the userland context. */
 
 	/* Shared between thread.c and synch.c. */

@@ -194,10 +194,12 @@ __do_fork (void *aux) {
 	if (succ) {
 		sema_up(&parent->fork_sema);
 		if_.R.rax = 0;
+		sema_down(&current->free_sema);
 		do_iret (&if_);
 	}
 error:
 	sema_up(&parent->fork_sema);
+	sema_down(&current->free_sema);
 	thread_exit ();
 }
 
@@ -268,6 +270,7 @@ process_wait (tid_t child_tid) {
 		if (child_thread == NULL)
 			return -1;
 
+		sema_up(&child_thread->free_sema);
 		sema_down(&child_thread->wait_sema);
 		list_remove(&child_thread->child_elem);
 
