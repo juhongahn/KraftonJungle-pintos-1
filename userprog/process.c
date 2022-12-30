@@ -235,8 +235,8 @@ process_wait (tid_t child_tid) {
 		if (child_thread == NULL)
 			return -1;
 		//printf("===== waiting thread name: %s =====\n", thread_current()->name); 
-		// sema_down(&child_thread->wait_sema);
-		// list_remove(&child_thread->child_elem);
+		sema_down(&child_thread->wait_sema);
+		list_remove(&child_thread->child_elem);
 
 		return child_thread->exit_status;
 	}

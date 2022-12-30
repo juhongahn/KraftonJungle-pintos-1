@@ -10,6 +10,7 @@
 #include "threads/init.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "threads/palloc.h"
 
 typedef int pid_t;
 
@@ -83,8 +84,7 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_EXEC:
-		//check_address(f->R.rdi);
-		printf("==== exec called\n ====");
+		check_address(f->R.rdi);
 		f->R.rax = exec(f->R.rdi);
 		
 		break;
@@ -177,10 +177,17 @@ fork (const char *thread_name){
 
 int
 exec (const char *cmd_line) {
-	printf("==== parent thread name: %s\n ======", thread_current()->name); 
-	tid_t tid = process_create_initd(cmd_line);
+	char *cmd_line_cpy = palloc_get_page(PAL_ZERO);
+	if (!cmd_line_cpy) {
+		exit(-1);
+	}
 
-	wait(tid);
+	int size = strlen(cmd_line) + 1; // 널 문자가 들어갈 공간
+	strlcpy(cmd_line_cpy, cmd_line, size);
+
+	if (process_exec(cmd_line_cpy) == -1) {
+		exit(-1);
+	}
 }
 
 int
