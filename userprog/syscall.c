@@ -81,6 +81,8 @@ syscall_handler (struct intr_frame *f) {
 		break;
 
 	case SYS_FORK:
+		check_address(f->R.rdi);
+		f->R.rax = fork(f->R.rdi);
 		break;
 
 	case SYS_EXEC:
@@ -155,8 +157,6 @@ check_address(void *addr) {
 	}
 }
 
-// ! TODO: 시스템 콜의 반환값을 rax 레지스터에 저장하기
-
 void
 halt (void) {
 	power_off();
@@ -172,7 +172,9 @@ exit (int status) {
 }
 
 pid_t
-fork (const char *thread_name){
+fork (const char *thread_name) {
+	pid_t pid = process_fork(thread_name);
+	return pid;
 }
 
 int

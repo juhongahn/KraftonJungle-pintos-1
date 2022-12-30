@@ -18,6 +18,7 @@
 #include "threads/mmu.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+#include "threads/vaddr.h"
 
 #ifdef VM
 #include "vm/vm.h"
@@ -64,6 +65,7 @@ process_create_initd (const char *file_name) {
 	return tid;
 }
 
+
 /* A thread function that launches first user process. */
 static void
 initd (void *f_name) {
@@ -82,9 +84,13 @@ initd (void *f_name) {
  * TID_ERROR if the thread cannot be created. */
 tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
+	struct thread *curr_thread = thread_current ();
 	/* Clone current thread to new thread.*/
-	return thread_create (name,
-			PRI_DEFAULT, __do_fork, thread_current ());
+	tid_t tid = thread_create (name,
+			PRI_DEFAULT, __do_fork, curr_thread);
+	sema_down(&curr_thread->fork_sema);
+
+	return tid;
 }
 
 #ifndef VM
@@ -95,25 +101,30 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	struct thread *current = thread_current ();
 	struct thread *parent = (struct thread *) aux;
 	void *parent_page;
-	void *newpage;
+	void *new_page;
 	bool writable;
 
 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
-
 	/* 2. Resolve VA from the parent's page map level 4. */
 	parent_page = pml4_get_page (parent->pml4, va);
+	if (is_kernel_vaddr(parent_page))
+			return false;
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
+	new_page = palloc_get_page(PAL_USER);
 
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
+	memcpy(new_page, parent_page, PGSIZE);
+	writable = is_writable(pml4e_walk(parent->pml4, parent_page, 0));
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
-	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
+	if (!pml4_set_page (current->pml4, va, new_page, writable)) {
 		/* 6. TODO: if fail to insert page, do error handling. */
+		return false;
 	}
 	return true;
 }
@@ -127,9 +138,10 @@ static void
 __do_fork (void *aux) {
 	struct intr_frame if_;
 	struct thread *parent = (struct thread *) aux;
-	struct thread *current = thread_current ();
+	struct thread *current = thread_current (); // 자식 쓰레드
+	// ! 구현
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if;
+	struct intr_frame *parent_if = &current->tf;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
@@ -150,18 +162,32 @@ __do_fork (void *aux) {
 		goto error;
 #endif
 
+	// ! 작업
 	/* TODO: Your code goes here.
 	 * TODO: Hint) To duplicate the file object, use `file_duplicate`
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
+	struct file **parent_fdt = parent->fdt;
+	struct file **child_fdt = current->fdt;
+
+	for (int i = 2; i < 512; i++) {
+		struct file *f = parent_fdt[i];
+		if (f) {
+			child_fdt[i] = f;
+		}
+	}
 
 	process_init ();
 
 	/* Finally, switch to the newly created process. */
-	if (succ)
+	if (succ) {
+		sema_up(&parent->fork_sema);
+		if_.R.rax = 0;
 		do_iret (&if_);
+	}
 error:
+	sema_up(&parent->fork_sema);
 	thread_exit ();
 }
 
@@ -192,9 +218,6 @@ process_exec (void *f_name) {
 	palloc_free_page (file_name);
 	if (!success)
 		return -1;
-
-	// struct thread *curr_thread = thread_current();
-	// sema_up(&curr_thread->wait_sema);
 
 	/* Start switched process. */
 	do_iret (&_if);
@@ -234,7 +257,7 @@ process_wait (tid_t child_tid) {
 		
 		if (child_thread == NULL)
 			return -1;
-		//printf("===== waiting thread name: %s =====\n", thread_current()->name); 
+
 		sema_down(&child_thread->wait_sema);
 		list_remove(&child_thread->child_elem);
 
@@ -253,9 +276,7 @@ process_exit (void) {
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	struct thread *curr = thread_current ();
-	// #ifdef USERPROG
-	// 	printf ("%s: exit(%d)\n",curr->name, curr->exit_status);
-	// #endif
+
 	if (curr->parent != NULL)
 			sema_up(&curr->wait_sema);
 	process_cleanup ();
