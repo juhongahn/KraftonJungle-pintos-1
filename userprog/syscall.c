@@ -359,12 +359,5 @@ void
 intr_frame_cpy(struct intr_frame *f) {
 	struct thread *curr_thread = thread_current();
 
-	// curr_thread->tf.R.rbx = f->R.rbx;
-	// curr_thread->tf.rsp = f->rsp;
-	// curr_thread->tf.R.rbp = f->R.rbp;
-	// curr_thread->tf.R.r12 = f->R.r12;
-	// curr_thread->tf.R.r13 = f->R.r13;
-	// curr_thread->tf.R.r14 = f->R.r14;
-	// curr_thread->tf.R.r15 = f->R.r15;
 	memcpy(&curr_thread->user_tf, f, sizeof(struct intr_frame));
 }
