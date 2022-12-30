@@ -110,8 +110,9 @@ pt_for_each (uint64_t *pt, pte_for_each_func *func, void *aux,
 								 ((uint64_t) pdp_index << PDPESHIFT) |
 								 ((uint64_t) pdx_index << PDXSHIFT) |
 								 ((uint64_t) i << PTXSHIFT));
-			if (!func (pte, va, aux))
+			if (!func (pte, va, aux)) {
 				return false;
+			}
 		}
 	}
 	return true;
@@ -149,8 +150,9 @@ pml4_for_each (uint64_t *pml4, pte_for_each_func *func, void *aux) {
 	for (unsigned i = 0; i < PGSIZE / sizeof(uint64_t *); i++) {
 		uint64_t *pdpe = ptov((uint64_t *) pml4[i]);
 		if (((uint64_t) pdpe) & PTE_P)
-			if (!pdp_for_each ((uint64_t *) PTE_ADDR (pdpe), func, aux, i))
+			if (!pdp_for_each ((uint64_t *) PTE_ADDR (pdpe), func, aux, i)) {
 				return false;
+			}
 	}
 	return true;
 }
