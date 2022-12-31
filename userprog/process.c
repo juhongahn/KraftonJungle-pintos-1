@@ -30,6 +30,7 @@ static void initd (void *f_name);
 static void __do_fork (void *);
 static int parse_file_name (char **argv, const char *file_name);
 static void pass_arguments (int argc, char **argv, struct intr_frame *if_);
+static struct thread *get_child_with_id (tid_t child_tid);
 
 /* General process initializer for initd and other process. */
 static void
@@ -90,12 +91,14 @@ process_fork (const char *name, struct intr_frame *if_) {
 	tid_t tid = thread_create (name,
 			PRI_DEFAULT, __do_fork, curr_thread);
 
-	// TODO:
-	if (tid == -1) {
+	if (tid == -1)
 		return TID_ERROR;
-	}
 
-	sema_down(&curr_thread->fork_sema);
+	struct thread *child_thread = get_child_with_id(tid);
+	sema_down(&child_thread->fork_sema);
+
+	if (child_thread->exit_status == -1)
+		return TID_ERROR;
 
 	return tid;
 }
@@ -192,13 +195,14 @@ __do_fork (void *aux) {
 
 	/* Finally, switch to the newly created process. */
 	if (succ) {
-		sema_up(&parent->fork_sema);
+		sema_up(&current->fork_sema);
 		if_.R.rax = 0;
 		sema_down(&current->free_sema);
 		do_iret (&if_);
 	}
 error:
-	sema_up(&parent->fork_sema);
+	current->exit_status = -1;
+	sema_up(&current->fork_sema);
 	sema_down(&current->free_sema);
 	thread_exit ();
 }
@@ -249,27 +253,10 @@ process_exec (void *f_name) {
 int
 process_wait (tid_t child_tid) {
 
-	struct thread *curr_thread = thread_current();	/* 부모 쓰레드 */
-	struct list *child_list = &curr_thread->child_list;
+	struct thread *child_thread = get_child_with_id(child_tid);
 
-	if (!list_empty(child_list))
+	if (child_thread)
 	{
-		struct thread *child_thread;
-		struct list_elem *e;
-
-		for (e = list_begin(child_list); e != list_end(child_list); e = list_next(e))
-		{
-			struct thread *tmp_thread = list_entry(e, struct thread, child_elem);
-			if (tmp_thread->tid == child_tid)
-			{
-				child_thread = tmp_thread;
-				break;
-			}
-		}
-		
-		if (child_thread == NULL)
-			return -1;
-
 		sema_up(&child_thread->free_sema);
 		sema_down(&child_thread->wait_sema);
 		list_remove(&child_thread->child_elem);
@@ -704,6 +691,25 @@ pass_arguments (int argc, char **argv, struct intr_frame *if_) {
     /* rdi, rsi 초기화 */
     if_->R.rdi = argc;
     if_->R.rsi = if_->rsp + ADDR_SIZE; /* argv[0]의 주소 */
+}
+
+struct thread *
+get_child_with_id (tid_t child_tid) {
+	struct thread *curr_thread = thread_current();
+	struct list *child_list = &curr_thread->child_list;
+
+	if (!list_empty(child_list))
+	{
+		struct list_elem *e;
+
+		for (e = list_begin(child_list); e != list_end(child_list); e = list_next(e))
+		{
+			struct thread *child_thread = list_entry(e, struct thread, child_elem);
+			if (child_thread->tid == child_tid)
+				return child_thread;
+		}
+	}
+	return NULL;
 }
 
 
