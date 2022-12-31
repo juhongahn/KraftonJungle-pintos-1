@@ -108,6 +108,7 @@ struct thread
 	struct semaphore fork_sema;	/* 자식 프로세스가 파일을 전부 복제할 때 까지 대기 */
 	struct semaphore free_sema; /* 부모가 대기 시작하기 전까지 자식 가둬두기 위한 세마포어 */
 	struct intr_frame user_tf;  /* Save the userland context. */
+	struct file *executable;    /* 실행 중인 파일 */
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem; /* List element. */
