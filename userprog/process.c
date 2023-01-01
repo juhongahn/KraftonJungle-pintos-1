@@ -314,8 +314,6 @@ process_exit (void) {
 	// fdt 반환
 	palloc_free_multiple(fdt, 3);
 
-	file_close(curr->executable);
-
 	sema_up(&curr->wait_sema);
 	sema_down(&curr->free_sema);
 	process_cleanup ();
@@ -450,7 +448,14 @@ load (const char *file_name, struct intr_frame *if_) {
 	}
 
 	/* 실행파일 저장 */
-	t->executable = file;
+	int fd = get_next_fd(t->fdt);
+	// if (fd == -1)
+	// {
+	// 	file_close(file);
+	// 	goto done;
+	// }
+	t->next_fd = fd;
+	t->fdt[fd] = file;
 	file_deny_write(file);
 
 	/* Read and verify executable header. */
