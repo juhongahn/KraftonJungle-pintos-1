@@ -435,7 +435,12 @@ load (const char *file_name, struct intr_frame *if_) {
 	}
 
 	/* fdt에 실행파일 저장 */
-	t->fdt[t->next_fd++] = file;
+	int fd = get_next_fd(t->fdt);
+	if (fd == -1)
+	{
+		return -1;
+	}
+	t->fdt[fd] = file;
 	file_deny_write(file);
 
 	/* Read and verify executable header. */
