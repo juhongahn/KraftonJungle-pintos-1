@@ -408,6 +408,8 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* Open executable file. */
 	file = filesys_open (file_name);
+	// ! 일관성 있게 구현하려면, syscall open과 마찬가지로
+	// ! open한 파일을 fdt로 관리해줘야 한다.
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
