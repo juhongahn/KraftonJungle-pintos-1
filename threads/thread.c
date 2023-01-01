@@ -217,7 +217,11 @@ tid_t thread_create(const char *name, int priority,
 	t->tf.eflags = FLAG_IF;
 
 	/* allocate file descriptor table */
-	t->fdt = palloc_get_page(PAL_ZERO); // ?
+	// ! 프로세스 종료 시 palloc_free_page도 해줘야 한다.
+	t->fdt = palloc_get_page(PAL_ZERO);
+
+	// ? fdt는 'file 구조체를 가리키는 포인터'를 가리키는데,
+	// ? 포인터가 아닌 int를 할당하는 건.. 이상하지만..
 	t->fdt[0] = 1; // ? stdin
 	t->fdt[1] = 2; // ? stdout
 	t->next_fd = 2;
