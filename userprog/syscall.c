@@ -353,7 +353,7 @@ close (int fd) {// FIXME: next_fd 갱신 로직 최적화
 bool
 is_invalid_fd(int fd)
 {
-	return fd < 0 || fd > FD_LIMIT_LEN;
+	return fd < 0 || fd >= FD_LIMIT_LEN;
 }
 
 void

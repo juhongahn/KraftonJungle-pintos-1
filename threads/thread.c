@@ -218,7 +218,9 @@ tid_t thread_create(const char *name, int priority,
 	t->tf.eflags = FLAG_IF;
 
 	/* allocate file descriptor table */
-	t->fdt = palloc_get_page(PAL_ZERO); // ?
+	t->fdt = palloc_get_multiple(PAL_ZERO, 3); // ?
+	if (t->fdt == NULL)
+		return TID_ERROR;
 	//t->fdt = malloc(sizeof(struct file* ) * 128);
 	t->fdt[0] = 1; // ? stdin
 	t->fdt[1] = 2; // ? stdout

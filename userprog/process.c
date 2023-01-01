@@ -32,6 +32,7 @@ static void __do_fork (void *);
 static int parse_file_name (char **argv, const char *file_name);
 static void pass_arguments (int argc, char **argv, struct intr_frame *if_);
 int get_next_fd(struct file **fdt);
+static struct thread *get_child_with_id (tid_t child_tid);
 
 /* General process initializer for initd and other process. */
 static void
@@ -62,8 +63,9 @@ process_create_initd (const char *file_name) {
 
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (argv[0], PRI_DEFAULT, initd, fn_copy);
-	if (tid == TID_ERROR)
+	if (tid == TID_ERROR) {
 		palloc_free_page (fn_copy);
+	}
 	return tid;
 }
 
@@ -97,7 +99,13 @@ process_fork (const char *name, struct intr_frame *if_) {
 		return TID_ERROR;
 	}
 
-	sema_down(&curr_thread->fork_sema);
+	struct thread *child_thread = get_child_with_id(tid);
+
+	if (!child_thread || child_thread->exit_status == -1) {
+		return TID_ERROR;
+	}
+
+	sema_down(&child_thread->fork_sema);
 	return tid;
 }
 
@@ -134,6 +142,7 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	 *    permission. */
 	if (!pml4_set_page (current->pml4, va, new_page, writable)) {
 		/* 6. TODO: if fail to insert page, do error handling. */
+		palloc_free_page(new_page);
 		return false;
 	}
 	return true;
@@ -199,11 +208,12 @@ __do_fork (void *aux) {
 
 	/* Finally, switch to the newly created process. */
 	if (succ) {
-		sema_up(&parent->fork_sema);
+		sema_up(&current->fork_sema);
 		do_iret (&if_);
 	}
 error:
-	sema_up(&parent->fork_sema);
+	current->exit_status = -1;
+	sema_up(&current->fork_sema);
 	thread_exit ();
 }
 
@@ -296,11 +306,13 @@ process_exit (void) {
 	/* 현재 쓰레드의 fdt에 있는 파일을 close */
 	struct file **fdt = curr->fdt;
 
+	fdt[0] = NULL;
+	fdt[1] = NULL;
 	for (int i = 2; i < FD_LIMIT_LEN; i++) {
 		close(i);
 	}
 	// fdt 반환
-	palloc_free_page(fdt);
+	palloc_free_multiple(fdt, 3);
 	sema_up(&curr->wait_sema);
 	sema_down(&curr->free_sema);
 	process_cleanup ();
@@ -438,9 +450,12 @@ load (const char *file_name, struct intr_frame *if_) {
 	int fd = get_next_fd(t->fdt);
 	if (fd == -1)
 	{
+		file_close (file);
 		return -1;
 	}
+	t->next_fd = fd;
 	t->fdt[fd] = file;
+	t->executable = file;
 	file_deny_write(file);
 
 	/* Read and verify executable header. */
@@ -522,7 +537,10 @@ load (const char *file_name, struct intr_frame *if_) {
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	//file_close (file);
+	if (!success) {
+		file_close (file);
+	}
+
 	return success;
 }
 
@@ -717,6 +735,24 @@ pass_arguments (int argc, char **argv, struct intr_frame *if_) {
     if_->R.rsi = if_->rsp + ADDR_SIZE; /* argv[0]의 주소 */
 }
 
+struct thread *
+get_child_with_id (tid_t child_tid) {
+	struct thread *curr_thread = thread_current();
+	struct list *child_list = &curr_thread->child_list;
+
+	if (!list_empty(child_list))
+	{
+		struct list_elem *e;
+
+		for (e = list_begin(child_list); e != list_end(child_list); e = list_next(e))
+		{
+			struct thread *child_thread = list_entry(e, struct thread, child_elem);
+			if (child_thread->tid == child_tid)
+				return child_thread;
+		}
+	}
+	return NULL;
+}
 
 /* Adds a mapping from user virtual address UPAGE to kernel
  * virtual address KPAGE to the page table.
