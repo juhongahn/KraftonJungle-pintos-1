@@ -152,8 +152,8 @@ check_address(void *addr) {
 	//		- 커널 가상 메모리 주소 공간을 가리키는 포인터 (=PHYS_BASE 위의 영역)
 	if (
 		!addr
-		|| !pml4_get_page(thread_current()->pml4, addr)
 		|| is_kernel_vaddr(addr)
+		|| !pml4_get_page(thread_current()->pml4, addr)
 	) {
 		// 2. 유저 영역을 벗어난 영역일 경우 프로세스 종료((exit(-1)))
 		exit(-1);
