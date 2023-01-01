@@ -19,7 +19,7 @@
 #include "threads/mmu.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
-#include "threads/vaddr.h"
+#include "threads/vaddr.h"        
 
 #ifdef VM
 #include "vm/vm.h"
@@ -31,6 +31,7 @@ static void initd (void *f_name);
 static void __do_fork (void *);
 static int parse_file_name (char **argv, const char *file_name);
 static void pass_arguments (int argc, char **argv, struct intr_frame *if_);
+int get_next_fd(struct file **fdt);
 
 /* General process initializer for initd and other process. */
 static void
@@ -97,7 +98,6 @@ process_fork (const char *name, struct intr_frame *if_) {
 	}
 
 	sema_down(&curr_thread->fork_sema);
-
 	return tid;
 }
 
@@ -155,6 +155,7 @@ __do_fork (void *aux) {
 
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
+	if_.R.rax = 0;
 
 	/* 2. Duplicate PT */
 	current->pml4 = pml4_create();
@@ -177,16 +178,21 @@ __do_fork (void *aux) {
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
+
+	/* 부모의 file을 자식에 복사 */
 	struct file **parent_fdt = parent->fdt;
 	struct file **child_fdt = current->fdt;
+
 	child_fdt[0] = 1;
 	child_fdt[1] = 2;
-	for (int i = 2; i < 512; i++) {
+
+	for (int i = 2; i < FD_LIMIT_LEN; i++) {
 		struct file *f = parent_fdt[i];
 		if (f) {
 			child_fdt[i] = file_duplicate(f);
 		}
 	}
+	
 	current->next_fd = parent->next_fd;
 
 	process_init ();
@@ -194,13 +200,10 @@ __do_fork (void *aux) {
 	/* Finally, switch to the newly created process. */
 	if (succ) {
 		sema_up(&parent->fork_sema);
-		if_.R.rax = 0;
-		sema_down(&current->free_sema);
 		do_iret (&if_);
 	}
 error:
 	sema_up(&parent->fork_sema);
-	sema_down(&current->free_sema);
 	thread_exit ();
 }
 
@@ -271,10 +274,9 @@ process_wait (tid_t child_tid) {
 		if (child_thread == NULL)
 			return -1;
 
-		sema_up(&child_thread->free_sema);
 		sema_down(&child_thread->wait_sema);
 		list_remove(&child_thread->child_elem);
-
+		sema_up(&child_thread->free_sema);
 		return child_thread->exit_status;
 	}
 
@@ -293,14 +295,14 @@ process_exit (void) {
 
 	/* 현재 쓰레드의 fdt에 있는 파일을 close */
 	struct file **fdt = curr->fdt;
-	int i;
 
-	for (i = 2; i < 512; i++) {
+	for (int i = 2; i < FD_LIMIT_LEN; i++) {
 		close(i);
 	}
-
-	if (curr->parent != NULL)
-			sema_up(&curr->wait_sema);
+	// fdt 반환
+	palloc_free_page(fdt);
+	sema_up(&curr->wait_sema);
+	sema_down(&curr->free_sema);
 	process_cleanup ();
 }
 
@@ -797,3 +799,15 @@ setup_stack (struct intr_frame *if_) {
 	return success;
 }
 #endif /* VM */
+
+/* next_fd를 찾아주는 함수 */
+int get_next_fd(struct file **fdt)
+{
+	for (int i = 2; i < FD_LIMIT_LEN; i++) {
+		struct file *f = fdt[i];
+		if (!f) {
+			return i;
+		}
+	}
+	return -1;
+}

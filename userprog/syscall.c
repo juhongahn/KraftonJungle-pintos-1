@@ -1,4 +1,5 @@
 #include "userprog/syscall.h"
+#include "userprog/process.h"
 #include <stdio.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
@@ -214,9 +215,18 @@ open (const char *file) {
 	struct thread *curr_t = thread_current();
 	struct file *f = filesys_open(file);
 
+	// TODO: next_fd가 필요할까?
+	int fd = get_next_fd(curr_t->fdt);
+	if (fd == -1)
+	{
+		return -1;
+	}
+
+	curr_t->next_fd = fd;
+
 	if (f) { // FIXME: next_fd 갱신 로직 최적화
 		curr_t->fdt[curr_t->next_fd] = f;
-		return curr_t->next_fd++;
+		return curr_t->next_fd;
 	}
 	else {
 		return -1;
@@ -343,15 +353,7 @@ close (int fd) {// FIXME: next_fd 갱신 로직 최적화
 bool
 is_invalid_fd(int fd)
 {
-	// TODO: fd 최대값 구하기
-	if (fd < 0 || fd > 512)
-	{
-		return 1;
-	}
-	else
-	{
-		return 0;
-	}
+	return fd < 0 || fd > FD_LIMIT_LEN;
 }
 
 void
