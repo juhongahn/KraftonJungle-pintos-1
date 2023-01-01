@@ -225,8 +225,8 @@ open (const char *file) {
 	curr_t->next_fd = fd;
 
 	if (f) { // FIXME: next_fd 갱신 로직 최적화
-		curr_t->fdt[curr_t->next_fd] = f;
-		return curr_t->next_fd;
+		curr_t->fdt[fd] = f;
+		return fd;
 	}
 	else {
 		return -1;
