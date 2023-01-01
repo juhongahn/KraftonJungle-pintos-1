@@ -16,10 +16,10 @@ typedef int pid_t;
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
-static void check_address(void *addr);
-
-static void halt (void) NO_RETURN;
 void exit (int status) NO_RETURN;
+void close (int fd);
+static void check_address(void *addr);
+static void halt (void) NO_RETURN;
 static pid_t fork (const char *thread_name);
 static int exec (const char *file);
 static int wait (pid_t pid);
@@ -31,7 +31,6 @@ static int read (int fd, void *buffer, unsigned length);
 static int write (int fd, const void *buffer, unsigned length);
 static void seek (int fd, unsigned position);
 static unsigned tell (int fd);
-static void close (int fd);
 static bool is_invalid_fd(int fd);
 static void intr_frame_cpy(struct intr_frame *f);
 

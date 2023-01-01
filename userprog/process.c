@@ -7,6 +7,7 @@
 #include <string.h>
 #include "userprog/gdt.h"
 #include "userprog/tss.h"
+#include "userprog/syscall.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -290,6 +291,14 @@ process_exit (void) {
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	struct thread *curr = thread_current ();
 
+	/* 현재 쓰레드의 fdt에 있는 파일을 close */
+	struct file **fdt = curr->fdt;
+	int i;
+
+	for (i = 2; i < 512; i++) {
+		close(i);
+	}
+
 	if (curr->parent != NULL)
 			sema_up(&curr->wait_sema);
 	process_cleanup ();
@@ -423,6 +432,10 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 	}
 
+	/* fdt에 실행파일 저장 */
+	t->fdt[t->next_fd++] = file;
+	file_deny_write(file);
+
 	/* Read and verify executable header. */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
 			|| memcmp (ehdr.e_ident, "\177ELF\2\1\1", 7)
@@ -502,7 +515,7 @@ load (const char *file_name, struct intr_frame *if_) {
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	file_close (file);
+	//file_close (file);
 	return success;
 }
 
