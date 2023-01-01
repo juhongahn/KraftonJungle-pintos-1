@@ -219,7 +219,7 @@ open (const char *file) {
 	int fd = get_next_fd(curr_t->fdt);
 	if (fd == -1)
 	{
-		return -1;
+		file_close(f);
 	}
 
 	curr_t->next_fd = fd;

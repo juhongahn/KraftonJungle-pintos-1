@@ -214,7 +214,7 @@ __do_fork (void *aux) {
 error:
 	current->exit_status = -1;
 	sema_up(&current->fork_sema);
-	thread_exit ();
+	exit(-1);
 }
 
 /* Switch the current execution context to the f_name.
@@ -313,6 +313,9 @@ process_exit (void) {
 	}
 	// fdt 반환
 	palloc_free_multiple(fdt, 3);
+
+	file_close(curr->executable);
+
 	sema_up(&curr->wait_sema);
 	sema_down(&curr->free_sema);
 	process_cleanup ();
@@ -446,15 +449,7 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 	}
 
-	/* fdt에 실행파일 저장 */
-	int fd = get_next_fd(t->fdt);
-	if (fd == -1)
-	{
-		file_close (file);
-		return -1;
-	}
-	t->next_fd = fd;
-	t->fdt[fd] = file;
+	/* 실행파일 저장 */
 	t->executable = file;
 	file_deny_write(file);
 
@@ -537,9 +532,9 @@ load (const char *file_name, struct intr_frame *if_) {
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	if (!success) {
-		file_close (file);
-	}
+	// if (!success) {
+	// 	file_close (file);
+	// }
 
 	return success;
 }
