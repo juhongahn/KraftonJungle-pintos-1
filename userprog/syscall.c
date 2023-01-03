@@ -210,20 +210,16 @@ remove (const char *file) {
 int
 open (const char *file) {
 
-	struct thread *curr_t = thread_current ();
+	struct thread *curr_thread = thread_current ();
 	struct file *f = filesys_open (file);
 
-	int fd = get_next_fd (curr_t);
-
-	if (fd == -1) {
-		file_close (f);
-	}
-
-	curr_t->next_fd = fd;
+	struct file_desc *fd;
+	fd->id = list_entry (list_rbegin (&curr_thread->file_descriptors), struct file_desc, elem)->id + 1;
 
 	if (f) {
-		curr_t->fdt[fd] = f;
-		return fd;
+		fd->file = f;
+		list_push_back (&curr_thread->file_descriptors, &fd->elem);
+		return fd->id;
 	}
 	else {
 		return -1;
@@ -232,12 +228,20 @@ open (const char *file) {
 
 int
 filesize (int fd) {
-	struct thread *curr_t = thread_current ();
-	struct file *file_p = curr_t->fdt[fd];
-	if (file_p == NULL) {
-		return -1;
+	struct thread *curr_thread = thread_current ();
+	struct list_elem *e;
+
+	for (e = list_begin (&curr_thread->file_descriptors); e != list_end (&curr_thread->file_descriptors); e = list_next (e)) {
+		struct file_desc *_fd = list_entry (e, struct file_desc, elem);
+
+		if (_fd->id == fd) {
+			if (_fd->file) {
+				return file_length (_fd->file);
+			}
+		}
 	}
-	return file_length (file_p);
+
+	return -1;
 }
 
 int
@@ -265,23 +269,29 @@ read (int fd, void *buffer, unsigned size) {
 	else {
 		/* 파일 디스크립터에 해당하는 파일을 가져와야한다. */
 		struct thread *curr_thread = thread_current ();
-		struct file **fdt = curr_thread->fdt;
-		// TODO: lock acquire failed
-		struct file *curr_file = fdt[fd];
-		if (curr_file == NULL) {
-			return -1;
+		struct list_elem *e;
+
+		for (e = list_begin (&curr_thread->file_descriptors); e != list_end (&curr_thread->file_descriptors); e = list_next (e)) {
+			struct file_desc *_fd = list_entry (e, struct file_desc, elem);
+
+			if (_fd->id == fd) {
+				struct file *f = _fd->file;
+
+				if (!f) {
+					return -1;
+				}
+
+				lock_acquire (&filesys_lock);
+				off_t read_size = file_read (f, buffer, size);
+				lock_release (&filesys_lock);
+				return read_size;
+			}
 		}
-		lock_acquire (&filesys_lock);
-		off_t read_size = file_read (curr_file, buffer, size);
-		lock_release (&filesys_lock);
-		return read_size;
 	}
 }
 
 int
 write (int fd, const void *buffer, unsigned size) {
-
-
 	if (fd == STDOUT_FILENO) {
 		putbuf (buffer, size);
 		return size;
@@ -294,45 +304,78 @@ write (int fd, const void *buffer, unsigned size) {
 	}
 	else {
 		int read_count;
-		struct thread *curr_thread = thread_current ();
-		struct file **fdt = curr_thread->fdt;
-		struct file *curr_file = fdt[fd];
 
-		if (curr_file == NULL) {
-			return 0;
+		// TODO: refactor
+		struct thread *curr_thread = thread_current ();
+		struct list_elem *e;
+
+		for (e = list_begin (&curr_thread->file_descriptors); e != list_end (&curr_thread->file_descriptors); e = list_next (e)) {
+			struct file_desc *_fd = list_entry (e, struct file_desc, elem);
+
+			if (_fd->id == fd) {
+				struct file *f = _fd->file;
+
+				if (!f) {
+					return 0;
+				}
+
+				lock_acquire (&filesys_lock);
+				read_count = file_write (f, buffer, size);
+				lock_release (&filesys_lock);
+				return read_count;
+			}
 		}
-		lock_acquire (&filesys_lock);
-		read_count = file_write (curr_file, buffer, size);
-		lock_release (&filesys_lock);
-		return read_count;
 	}
 }
 
 void
 seek (int fd, unsigned position) {
 	struct thread *curr_thread = thread_current ();
-	struct file **fdt = curr_thread->fdt;
-	struct file *curr_file = fdt[fd];
+	struct list_elem *e;
 
-	file_seek (curr_file, position);
+	for (e = list_begin (&curr_thread->file_descriptors); e != list_end (&curr_thread->file_descriptors); e = list_next (e)) {
+		struct file_desc *_fd = list_entry (e, struct file_desc, elem);
+
+		if (_fd->id == fd) {
+			file_seek (_fd->file, position);
+			return;
+		}
+	}
 }
 
 unsigned
 tell (int fd) {
 	struct thread *curr_thread = thread_current ();
-	struct file **fdt = curr_thread->fdt;
-	struct file *curr_file = fdt[fd];
-	return file_tell (curr_file);
+	struct list_elem *e;
+
+	for (e = list_begin (&curr_thread->file_descriptors); e != list_end (&curr_thread->file_descriptors); e = list_next (e)) {
+		struct file_desc *_fd = list_entry (e, struct file_desc, elem);
+
+		if (_fd->id == fd) {
+			file_tell (_fd->file);
+			return;
+		}
+	}
 }
 
 void
 close (int fd) {
 	if (!is_invalid_fd (fd)) {
-		struct thread *curr = thread_current ();
-		struct file *file_p = curr->fdt[fd];
-		if (!file_p == NULL) {
-			file_close (file_p);
-			curr->fdt[fd] = NULL;
+		struct thread *curr_thread = thread_current ();
+		struct list_elem *e;
+
+		for (e = list_begin (&curr_thread->file_descriptors); e != list_end (&curr_thread->file_descriptors); e = list_next (e)) {
+			struct file_desc *_fd = list_entry (e, struct file_desc, elem);
+
+			if (_fd->id == fd) {
+				struct file *f = _fd->file;
+
+				if (f) {
+					file_close (f);
+					list_remove (e);
+					return;
+				}
+			}
 		}
 	}
 }

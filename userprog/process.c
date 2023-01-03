@@ -180,17 +180,31 @@ __do_fork (void *aux) {
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
-	struct file **parent_fdt = parent->fdt;
-	struct file **child_fdt = current->fdt;
-	child_fdt[0] = 1;
-	child_fdt[1] = 2;
-	for (int i = 2; i < FD_LIMIT; i++) {
-		struct file *f = parent_fdt[i];
-		if (f) {
-			child_fdt[i] = file_duplicate (f);
+	struct list *parent_fd_list = &parent->file_descriptors;
+	struct list *child_fd_list = &current->file_descriptors;
+	struct file_desc *_stdin;
+	struct file_desc *_stdout;
+	_stdin->id = 0;
+	_stdout->id = 1;
+
+	struct list_elem *e;
+
+	for (e = list_begin (parent_fd_list); e != list_end (parent_fd_list); e = list_next (e)) {
+		struct file_desc *fd = list_entry (e, struct file_desc, elem);
+
+		if (fd->id == 0) {
+			list_push_back (child_fd_list, _stdin);
+			continue;
 		}
+		if (fd->id == 1) {
+			list_push_back (child_fd_list, _stdout);
+			continue;
+		}
+
+		struct file *f = fd->file;
+		fd->file = file_duplicate (f);
+		list_push_back (child_fd_list, &fd->elem);
 	}
-	current->next_fd = parent->next_fd;
 
 	process_init ();
 
@@ -277,18 +291,17 @@ process_exit (void) {
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	struct thread *curr = thread_current ();
 
-	sema_up (&curr->wait_sema);
+	/* 현재 쓰레드의 fd list에 있는 파일을 close */
+	struct list_elem *e;
 
-	/* 현재 쓰레드의 fdt에 있는 파일을 close */
-	struct file **fdt = curr->fdt;
-
-	fdt[0] = NULL;
-	fdt[1] = NULL;
-	for (int i = 2; i < FD_LIMIT; i++) {
-		close (i);
+	for (e = list_begin (&curr->file_descriptors); e != list_end (&curr->file_descriptors); e = list_next (e)) {
+		struct file_desc *fd = list_entry (e, struct file_desc, elem);
+		if (fd->id >= 2) {
+			close (fd->id);
+		}
+		list_remove (e);
 	}
-	// fdt 반환
-	palloc_free_multiple (fdt, 3);
+
 	sema_up (&curr->wait_sema);
 	sema_down (&curr->free_sema);
 
@@ -418,16 +431,16 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* Open executable file. */
 	file = filesys_open (file_name);
-	// ! 일관성 있게 구현하려면, syscall open과 마찬가지로
-	// ! open한 파일을 fdt로 관리해줘야 한다.
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
 
-	int fd = get_next_fd (t);
-	t->next_fd = fd;
-	t->fdt[fd] = file;
+	struct file_desc *fd;
+	// TODO: get_next_fd_id
+	fd->id = list_entry (list_rbegin (&t->file_descriptors), struct file_desc, elem)->id + 1;
+	fd->file = file;
+	list_push_back (&t->file_descriptors, &fd->elem);
 	file_deny_write (file);
 
 	/* Read and verify executable header. */
@@ -721,16 +734,16 @@ struct thread *
 	return NULL;
 }
 
-int get_next_fd (struct thread *t) {
-	for (int i = 2; i < FD_LIMIT; i++) {
-		if (t->fdt[i] == NULL) {
-			return i;
-		}
-	}
+// int get_next_fd (struct thread *t) {
+// 	for (int i = 2; i < FD_LIMIT; i++) {
+// 		if (t->fdt[i] == NULL) {
+// 			return i;
+// 		}
+// 	}
 
-	/* fdt에 사용 가능한 fd가 존재하지 않을 경우. */
-	return -1;
-}
+// 	/* fdt에 사용 가능한 fd가 존재하지 않을 경우. */
+// 	return -1;
+// }
 
 
 /* Adds a mapping from user virtual address UPAGE to kernel

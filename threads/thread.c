@@ -12,9 +12,10 @@
 #include "threads/vaddr.h"
 #include "intrinsic.h"
 #include "filesys/file.h"
-#ifdef USERPROG
+// #ifdef USERPROG
 #include "userprog/process.h"
-#endif
+#include "threads/malloc.h"
+// #endif
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -191,7 +192,6 @@ tid_t thread_create (const char *name, int priority,
 {
 	struct thread *t;
 	tid_t tid;
-	struct file **fdt;
 	struct thread *curr_thread = thread_current ();
 
 	ASSERT (function != NULL);
@@ -215,19 +215,6 @@ tid_t thread_create (const char *name, int priority,
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
-
-	/* allocate file descriptor table */
-	// ! 프로세스 종료 시 palloc_free_page도 해줘야 한다.
-	t->fdt = palloc_get_multiple (PAL_ZERO, 3);
-
-	if (t->fdt == NULL)
-		return TID_ERROR;
-
-	// ? fdt는 'file 구조체를 가리키는 포인터'를 가리키는데,
-	// ? 포인터가 아닌 int를 할당하는 건.. 이상하지만..
-	t->fdt[0] = 1; // ? stdin
-	t->fdt[1] = 2; // ? stdout
-	t->next_fd = 2;
 
 	/* 자식 쓰레드에 부모 쓰레드 저장 */
 	t->parent = curr_thread;
@@ -469,6 +456,16 @@ init_thread (struct thread *t, const char *name, int priority)
 	t->parent = NULL;
 	list_init (&t->child_list);
 
+#ifdef USERPROG
+	/* project 2 - fd 관련 초기화 */
+	list_init (&t->file_descriptors);
+	struct file_desc *_stdin;
+	struct file_desc *_stdout;
+	_stdin->id = 0;
+	_stdout->id = 1;
+	list_push_back (&t->file_descriptors, &_stdin->elem);
+	list_push_back (&t->file_descriptors, &_stdout->elem);
+#endif
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

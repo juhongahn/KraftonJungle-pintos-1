@@ -100,8 +100,6 @@ struct thread
 	struct list donations;	   /* 우선순위를 준 스레드 목록 */
 	struct list_elem d_elem;   /* 도너를 연결하기 위한 elem */
 	int old_priority;		   /* 도네이트 받기 전 우선순위 */
-	struct file **fdt;     	   /* File Descriptor Table */
-	int next_fd;               /* 다음에 fd를 넣을 자리 */
 	int exit_status;		   /* 프로세스 종료 상태 */
 	struct thread *parent;     /* 부모 프로세스 포인터 */
 	struct list child_list;	   /* 자식 프로세스 리스트 */
@@ -110,6 +108,7 @@ struct thread
 	struct semaphore fork_sema;	/* 자식 프로세스가 파일을 전부 복제할 때 까지 대기 */
 	struct semaphore free_sema; /* 부모가 대기 시작하기 전까지 자식 가둬두기 위한 세마포어 */
 	struct intr_frame user_tf;  /* Save the userland context. */
+	struct file *executing_file;	/* 실행 중인 파일 */
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem; /* List element. */
@@ -117,6 +116,7 @@ struct thread
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4; /* Page map level 4 */
+	struct list file_descriptors;	/* fd 목록 */
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
