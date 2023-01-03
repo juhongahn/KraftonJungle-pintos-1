@@ -340,13 +340,7 @@ close (int fd) {
 bool
 is_invalid_fd (int fd)
 {
-	// TODO: fd 최대값 구하기
-	if (fd < 0 || fd >= FD_LIMIT) {
-		return 1;
-	}
-	else {
-		return 0;
-	}
+	return fd < 0 || fd >= FD_LIMIT;
 }
 
 void

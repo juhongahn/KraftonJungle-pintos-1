@@ -96,10 +96,10 @@ process_fork (const char *name, struct intr_frame *if_) {
 
 	struct thread *child_thread = get_child_with_id (tid);
 
-	sema_down (&child_thread->fork_sema);
-
-	if (child_thread->exit_status == -1)
+	if (!child_thread || child_thread->exit_status == -1)
 		return TID_ERROR;
+
+	sema_down (&child_thread->fork_sema);
 
 	return tid;
 }
@@ -175,7 +175,6 @@ __do_fork (void *aux) {
 		goto error;
 	}
 #endif
-	// ! 작업
 	/* TODO: Your code goes here.
 	 * TODO: Hint) To duplicate the file object, use `file_duplicate`
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
@@ -206,7 +205,7 @@ error:
 	current->exit_status = -1;
 	sema_up (&current->fork_sema);
 	// sema_down(&current->free_sema);
-	thread_exit ();
+	exit (-1);
 }
 
 /* Switch the current execution context to the f_name.
