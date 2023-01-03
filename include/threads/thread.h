@@ -29,6 +29,8 @@ typedef int tid_t;
 #define PRI_DEFAULT 31 /* Default priority. */
 #define PRI_MAX 63	   /* Highest priority. */
 
+#define FD_LIMIT 128
+
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
@@ -80,12 +82,12 @@ typedef int tid_t;
  * the `magic' member of the running thread's `struct thread' is
  * set to THREAD_MAGIC.  Stack overflow will normally change this
  * value, triggering the assertion. */
-/* The `elem' member has a dual purpose.  It can be an element in
- * the run queue (thread.c), or it can be an element in a
- * semaphore wait list (synch.c).  It can be used these two ways
- * only because they are mutually exclusive: only a thread in the
- * ready state is on the run queue, whereas only a thread in the
- * blocked state is on a semaphore wait list. */
+ /* The `elem' member has a dual purpose.  It can be an element in
+  * the run queue (thread.c), or it can be an element in a
+  * semaphore wait list (synch.c).  It can be used these two ways
+  * only because they are mutually exclusive: only a thread in the
+  * ready state is on the run queue, whereas only a thread in the
+  * blocked state is on a semaphore wait list. */
 struct thread
 {
 	/* Owned by thread.c. */
@@ -108,7 +110,6 @@ struct thread
 	struct semaphore fork_sema;	/* 자식 프로세스가 파일을 전부 복제할 때 까지 대기 */
 	struct semaphore free_sema; /* 부모가 대기 시작하기 전까지 자식 가둬두기 위한 세마포어 */
 	struct intr_frame user_tf;  /* Save the userland context. */
-	struct file *executable;    /* 실행 중인 파일 */
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem; /* List element. */
@@ -132,44 +133,44 @@ struct thread
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
 
-void thread_init(void);
-void thread_start(void);
+void thread_init (void);
+void thread_start (void);
 
-void thread_tick(void);
-void thread_print_stats(void);
+void thread_tick (void);
+void thread_print_stats (void);
 
-typedef void thread_func(void *aux);
-tid_t thread_create(const char *name, int priority, thread_func *, void *);
+typedef void thread_func (void *aux);
+tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
-void thread_block(void);
-void thread_unblock(struct thread *);
+void thread_block (void);
+void thread_unblock (struct thread *);
 
-struct thread *thread_current(void);
-tid_t thread_tid(void);
-const char *thread_name(void);
+struct thread *thread_current (void);
+tid_t thread_tid (void);
+const char *thread_name (void);
 
-void thread_exit(void) NO_RETURN;
-void thread_yield(void);
+void thread_exit (void) NO_RETURN;
+void thread_yield (void);
 
-int thread_get_priority(void);
-void thread_set_priority(int);
+int thread_get_priority (void);
+void thread_set_priority (int);
 
-int thread_get_nice(void);
-void thread_set_nice(int);
-int thread_get_recent_cpu(void);
-int thread_get_load_avg(void);
+int thread_get_nice (void);
+void thread_set_nice (int);
+int thread_get_recent_cpu (void);
+int thread_get_load_avg (void);
 
-void thread_sleep(int64_t ticks);
-void thread_awake(int64_t ticks);
-void update_next_tick_to_awake(int64_t ticks);
-int64_t get_next_tick_to_awake(void);
+void thread_sleep (int64_t ticks);
+void thread_awake (int64_t ticks);
+void update_next_tick_to_awake (int64_t ticks);
+int64_t get_next_tick_to_awake (void);
 
-void do_iret(struct intr_frame *tf);
-bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
-bool cmp_donation_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
-void test_max_priority(void);
-void donate_priority(void);
-void remove_with_lock(struct lock *lock);
-void refresh_priority(void);
+void do_iret (struct intr_frame *tf);
+bool cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool cmp_donation_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
+void test_max_priority (void);
+void donate_priority (void);
+void remove_with_lock (struct lock *lock);
+void refresh_priority (void);
 
 #endif /* threads/thread.h */

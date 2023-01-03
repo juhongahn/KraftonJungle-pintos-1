@@ -21,12 +21,12 @@
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
 
-/* Random value for basic thread
-   Do not modify this value. */
+   /* Random value for basic thread
+	  Do not modify this value. */
 #define THREAD_BASIC 0xd42df210
 
-/* List of processes in THREAD_READY state, that is, processes
-   that are ready to run but not actually running. */
+	  /* List of processes in THREAD_READY state, that is, processes
+		 that are ready to run but not actually running. */
 static struct list ready_list;
 /* block 상태인 쓰레드들이 저장된 리스트 */
 static struct list sleep_list;
@@ -84,10 +84,10 @@ bool cmp_donation_priority(const struct list_elem *a, const struct list_elem *b,
  * somewhere in the middle, this locates the curent thread. */
 #define running_thread() ((struct thread *)(pg_round_down(rrsp())))
 
-// Global descriptor table for the thread_start.
-// Because the gdt will be setup after the thread_init, we should
-// setup temporal gdt first.
-static uint64_t gdt[3] = {0, 0x00af9a000000ffff, 0x00cf92000000ffff};
+ // Global descriptor table for the thread_start.
+ // Because the gdt will be setup after the thread_init, we should
+ // setup temporal gdt first.
+static uint64_t gdt[3] = { 0, 0x00af9a000000ffff, 0x00cf92000000ffff };
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -111,7 +111,7 @@ void thread_init(void)
 	 * The kernel will rebuild the gdt with user context, in gdt_init (). */
 	struct desc_ptr gdt_ds = {
 		.size = sizeof(gdt) - 1,
-		.address = (uint64_t)gdt};
+		.address = (uint64_t)gdt };
 	lgdt(&gdt_ds);
 
 	/* Init the global thread context */
@@ -168,7 +168,7 @@ void thread_tick(void)
 void thread_print_stats(void)
 {
 	printf("Thread: %lld idle ticks, %lld kernel ticks, %lld user ticks\n",
-		   idle_ticks, kernel_ticks, user_ticks);
+		idle_ticks, kernel_ticks, user_ticks);
 }
 
 /* Creates a new kernel thread named NAME with the given initial
@@ -187,7 +187,7 @@ void thread_print_stats(void)
    PRIORITY, but no actual priority scheduling is implemented.
    Priority scheduling is the goal of Problem 1-3. */
 tid_t thread_create(const char *name, int priority,
-					thread_func *function, void *aux)
+	thread_func *function, void *aux)
 {
 	struct thread *t;
 	tid_t tid;
@@ -218,7 +218,7 @@ tid_t thread_create(const char *name, int priority,
 
 	/* allocate file descriptor table */
 	// ! 프로세스 종료 시 palloc_free_page도 해줘야 한다.
-	t->fdt = palloc_get_page(PAL_ZERO);
+	t->fdt = palloc_get_multiple(PAL_ZERO, 3);
 
 	// ? fdt는 'file 구조체를 가리키는 포인터'를 가리키는데,
 	// ? 포인터가 아닌 int를 할당하는 건.. 이상하지만..
@@ -287,7 +287,7 @@ thread_name(void)
    This is running_thread() plus a couple of sanity checks.
    See the big comment at the top of thread.h for details. */
 struct thread *
-thread_current(void)
+	thread_current(void)
 {
 	struct thread *t = running_thread();
 
@@ -402,8 +402,7 @@ idle(void *idle_started_ UNUSED)
 	idle_thread = thread_current();
 	sema_up(idle_started);
 
-	for (;;)
-	{
+	for (;;) {
 		/* Let someone else run. */
 		intr_disable();
 		thread_block();
@@ -421,9 +420,9 @@ idle(void *idle_started_ UNUSED)
 		   See [IA32-v2a] "HLT", [IA32-v2b] "STI", and [IA32-v3a]
 		   7.11.1 "HLT Instruction". */
 		asm volatile("sti; hlt"
-					 :
-					 :
-					 : "memory");
+			:
+		:
+			: "memory");
 	}
 }
 
@@ -447,7 +446,7 @@ init_thread(struct thread *t, const char *name, int priority)
 	ASSERT(PRI_MIN <= priority && priority <= PRI_MAX);
 	ASSERT(name != NULL);
 
-	memset(t, 0, sizeof *t);
+	memset(t, 0, sizeof * t);
 	t->status = THREAD_BLOCKED;
 	strlcpy(t->name, name, sizeof t->name);
 	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
@@ -487,7 +486,7 @@ next_thread_to_run(void)
 void do_iret(struct intr_frame *tf)
 {
 	__asm __volatile(
-		"movq %0, %%rsp\n"
+	"movq %0, %%rsp\n"
 		"movq 0(%%rsp),%%r15\n"
 		"movq 8(%%rsp),%%r14\n"
 		"movq 16(%%rsp),%%r13\n"
@@ -509,7 +508,7 @@ void do_iret(struct intr_frame *tf)
 		"addq $32, %%rsp\n"
 		"iretq"
 		:
-		: "g"((uint64_t)tf)
+	: "g"((uint64_t)tf)
 		: "memory");
 }
 
@@ -536,8 +535,8 @@ thread_launch(struct thread *th)
 	 * Note that, we SHOULD NOT use any stack from here
 	 * until switching is done. */
 	__asm __volatile(
-		/* Store registers that will be used. */
-		"push %%rax\n"
+	/* Store registers that will be used. */
+	"push %%rax\n"
 		"push %%rbx\n"
 		"push %%rcx\n"
 		/* Fetch input once */
@@ -580,7 +579,7 @@ thread_launch(struct thread *th)
 		"call do_iret\n"
 		"out_iret:\n"
 		:
-		: "g"(tf_cur), "g"(tf)
+	: "g"(tf_cur), "g"(tf)
 		: "memory");
 }
 
@@ -593,8 +592,7 @@ do_schedule(int status)
 {
 	ASSERT(intr_get_level() == INTR_OFF);
 	ASSERT(thread_current()->status == THREAD_RUNNING);
-	while (!list_empty(&destruction_req))
-	{
+	while (!list_empty(&destruction_req)) {
 		struct thread *victim =
 			list_entry(list_pop_front(&destruction_req), struct thread, elem);
 		palloc_free_page(victim);
@@ -623,8 +621,7 @@ schedule(void)
 	process_activate(next);
 #endif
 
-	if (curr != next)
-	{
+	if (curr != next) {
 		/* If the thread we switched from is dying, destroy its struct
 		   thread. This must happen late so that thread_exit() doesn't
 		   pull out the rug under itself.
@@ -632,8 +629,7 @@ schedule(void)
 		   currently used bye the stack.
 		   The real destruction logic will be called at the beginning of the
 		   schedule(). */
-		if (curr && curr->status == THREAD_DYING && curr != initial_thread)
-		{
+		if (curr && curr->status == THREAD_DYING && curr != initial_thread) {
 			ASSERT(curr != next);
 			list_push_back(&destruction_req, &curr->elem);
 		}
@@ -665,8 +661,7 @@ void thread_sleep(int64_t ticks)
 	enum intr_level old_level;
 	ASSERT(!intr_context());
 	old_level = intr_disable();
-	if (curr != idle_thread)
-	{
+	if (curr != idle_thread) {
 		list_push_back(&sleep_list, &curr->elem);
 		update_next_tick_to_awake(ticks);
 		curr->wakeup_tick = ticks;
@@ -678,8 +673,7 @@ void thread_sleep(int64_t ticks)
 /* sleep list에 있는 쓰레드들의 틱 중 최소값으로 next_tick_to_awake를 갱신 */
 void update_next_tick_to_awake(int64_t ticks)
 {
-	if (ticks <= get_next_tick_to_awake())
-	{
+	if (ticks <= get_next_tick_to_awake()) {
 		next_tick_to_awake = ticks;
 	}
 }
@@ -695,16 +689,13 @@ get_next_tick_to_awake(void)
 void thread_awake(int64_t ticks)
 {
 	struct list_elem *el = list_begin(&sleep_list);
-	while (el != list_end(&sleep_list))
-	{
+	while (el != list_end(&sleep_list)) {
 		struct thread *c_thread = list_entry(el, struct thread, elem);
-		if (c_thread->wakeup_tick <= ticks)
-		{
+		if (c_thread->wakeup_tick <= ticks) {
 			el = list_remove(el);
 			thread_unblock(c_thread);
 		}
-		else
-		{
+		else {
 			el = list_next(el);
 		}
 	}
@@ -733,8 +724,7 @@ void test_max_priority(void)
 	struct thread *max_priority_thread = list_entry(list_begin(&ready_list), struct thread, elem);
 	struct thread *curr_thread = thread_current();
 
-	if (max_priority_thread->priority > curr_thread->priority)
-	{
+	if (max_priority_thread->priority > curr_thread->priority) {
 		thread_yield();
 	}
 }
@@ -747,13 +737,11 @@ void donate_priority(void)
 	struct thread *curr_thread = thread_current();
 	int cnt = 0;
 
-	for (cnt = 0; cnt < 8; cnt++)
-	{
+	for (cnt = 0; cnt < 8; cnt++) {
 		if (curr_thread->wait_on_lock == NULL)
 			break;
 		struct thread *lock_holder = curr_thread->wait_on_lock->holder;
-		if (curr_thread->priority > lock_holder->priority)
-		{
+		if (curr_thread->priority > lock_holder->priority) {
 			lock_holder->priority = curr_thread->priority;
 			curr_thread = lock_holder;
 		}
@@ -767,12 +755,10 @@ void remove_with_lock(struct lock *lock)
 	struct thread *curr_thread = thread_current();
 	struct list_elem *e;
 
-	for (e = list_begin(&curr_thread->donations); e != list_end(&curr_thread->donations); e = list_next(e))
-	{
+	for (e = list_begin(&curr_thread->donations); e != list_end(&curr_thread->donations); e = list_next(e)) {
 		struct thread *lock_waiter = list_entry(e, struct thread, d_elem);
 
-		if (lock == lock_waiter->wait_on_lock)
-		{
+		if (lock == lock_waiter->wait_on_lock) {
 			list_remove(&lock_waiter->d_elem);
 		}
 	}
